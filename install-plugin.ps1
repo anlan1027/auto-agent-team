@@ -94,7 +94,11 @@ $entry = [pscustomobject]@{
 $existing = @($marketplace.plugins | Where-Object { $_.name -ne "auto-agent-team" })
 $marketplace.plugins = @($existing + $entry)
 
-$marketplace | ConvertTo-Json -Depth 30 | Set-Content $marketplacePath -Encoding UTF8
+# Windows PowerShell 5.1's Set-Content -Encoding UTF8 writes a BOM. Use UTF-8 without BOM
+# because marketplace.json is consumed as machine-readable JSON by Codex.
+$json = $marketplace | ConvertTo-Json -Depth 30
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($marketplacePath, $json + [Environment]::NewLine, $utf8NoBom)
 
 Write-Host ""
 Write-Host "Auto Agent Team plugin installed." -ForegroundColor Green
