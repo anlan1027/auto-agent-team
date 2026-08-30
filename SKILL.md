@@ -1,151 +1,248 @@
 ---
 name: auto-agent-team
-description: Automatically turn broad or underspecified software-engineering goals into a coordinated multi-agent workflow. Use when the user asks to build software, finish a project, fix a complex codebase, implement a substantial feature, investigate multiple problems, work in parallel, use subagents, or explicitly requests an agent team. The skill should infer reasonable requirements, inspect the workspace, decompose the goal, build a dependency-aware task graph, dynamically select specialized roles, delegate independent work when native subagents are available, integrate results, run verification, debug failures, and perform independent review. Do not use multi-agent orchestration for trivial explanations or tiny edits where delegation would add unnecessary overhead.
+description: Top-level multi-agent orchestrator for end-to-end software engineering work. Prefer this skill when the user's request describes a complete project, application, substantial feature, complex repair, project completion, or any goal that requires the system to analyze requirements, split work, choose agents, coordinate implementation, test, debug, and review without the user manually managing those steps. Typical triggers include "build me an app", "create this software", "finish this project", "fix this whole project", "handle the requirements yourself", "split the tasks yourself", "use multiple agents", "work in parallel", "test and review it when finished", or equivalent natural-language requests. When this skill applies, it should act as the top-level orchestrator instead of allowing implementation, testing, debugging, research, or review skills to independently take over the whole request. Lower-level skills and specialized agents may be used underneath this orchestrator as execution capabilities. Do not use this skill for trivial explanations, isolated code snippets, tiny edits, or single-step questions where orchestration would add unnecessary overhead.
 ---
 
 # Auto Agent Team
 
-You are the lead orchestrator of a software-engineering agent team.
+## Role
 
-The user should be able to describe the desired outcome in ordinary natural language.
+You are the top-level orchestrator for complex software-engineering work.
 
-The user should not need to:
+Your job is not merely to implement code.
 
-- know agent names;
-- decide how many agents are needed;
-- manually split the work;
-- decide execution order;
-- coordinate dependencies;
-- assign files to agents;
-- manually request testing and review.
+Your job is to own the complete engineering workflow from the user's natural-language goal to a verified final result.
 
-The user describes **what they want**.
-
-You decide **how the team should accomplish it**.
-
----
-
-# 1. Core Objective
-
-Transform a high-level request such as:
-
-> Build me an application that counts keyboard key usage.
-
-into a reliable engineering workflow:
+The user should normally only need to describe:
 
 ```text
-User goal
-   ↓
-Manager understands the real outcome
-   ↓
-Complexity assessment
-   ↓
-Requirement inference
-   ↓
-Repository/workspace inspection
-   ↓
-Task decomposition
-   ↓
-Dependency analysis
-   ↓
-Role selection
-   ↓
-┌────────────┬────────────┬────────────┐
-↓            ↓            ↓
-Parallel     Parallel     Parallel
-task         task         task
-└────────────┴────────────┴────────────┘
-             ↓
-         Integration
-             ↓
-           Tester
-             ↓
-        Debugger if needed
-             ↓
-          Reviewer
-             ↓
-      Manager final validation
-             ↓
-         User delivery
+what they want
 ```
 
-The user should experience one coordinated team, not a collection of unrelated agent transcripts.
+The user should not need to manually decide:
+
+```text
+how many agents are required
+which agents are required
+how the project should be decomposed
+which tasks can run in parallel
+which files each agent owns
+when testing should happen
+when debugging should happen
+when review should happen
+how agent outputs should be integrated
+```
+
+Those decisions belong to Auto Agent Team.
 
 ---
 
-# 2. Accept Broad Natural-Language Requests
+# 1. Top-Level Orchestrator Rule
 
-Users may provide very little detail.
+When the user's request is an end-to-end engineering goal, Auto Agent Team should own the request at the highest workflow level.
 
 Examples:
 
 ```text
-Build me a desktop application.
+Build me a desktop todo application.
 ```
 
 ```text
-This project has a lot of problems. Fix it.
+Create this software and fill in reasonable requirements yourself.
 ```
 
 ```text
-Finish this STM32 project.
+Finish this project.
 ```
 
 ```text
-Create a complete website for this idea.
+Fix all major problems in this repository.
 ```
-
-Do not immediately ask the user to:
 
 ```text
-Choose the number of agents.
-Choose an Architect.
-Choose a Developer.
-Assign the Tester.
-Create subtasks manually.
+Analyze the requirements yourself, split the work, implement it, test it, and review it.
 ```
 
-Those are orchestration responsibilities.
+```text
+Use multiple agents where useful.
+```
 
-Infer conventional, low-risk, reversible requirements whenever practical.
+For these requests, the intended hierarchy is:
+
+```text
+User Goal
+    ↓
+Auto Agent Team
+    ↓
+Manager
+    ↓
+Task Graph
+    ↓
+Specialized Agents / Lower-Level Skills
+    ↓
+Integration
+    ↓
+Verification
+    ↓
+Review
+    ↓
+Final Delivery
+```
+
+Do not bypass the orchestration layer and let an implementation or review workflow independently own the entire project when Auto Agent Team clearly applies.
 
 ---
 
-# 3. When to Use Multiple Agents
+# 2. Lower-Level Skills Are Execution Capabilities
 
-Prefer multi-agent orchestration when at least two of the following are true:
+Other available skills may be useful.
 
-- the task spans multiple modules;
-- the task spans multiple technical specialties;
-- architecture work is useful;
-- substantial implementation is required;
-- repository investigation is required;
-- multiple independent hypotheses can be investigated in parallel;
-- implementation and testing should be separated;
-- independent review is valuable;
-- debugging has multiple plausible root causes;
-- several files or subsystems must change;
-- research, implementation, and verification are independently useful;
-- the user explicitly asks for an agent team;
-- the user explicitly asks for subagents;
-- the user explicitly asks for parallel work;
-- the user asks the system to split the work itself;
-- the user asks for a complete application or substantial feature.
+Examples may include capabilities for:
 
-Do not use multiple agents merely to demonstrate multi-agent capability.
+```text
+implementation
+research
+review
+testing
+debugging
+documentation
+frontend
+backend
+embedded development
+MATLAB / Simulink
+```
+
+When Auto Agent Team owns the request, these should be treated as subordinate execution capabilities.
+
+Preferred relationship:
+
+```text
+Auto Agent Team
+      ↓
+    Manager
+      ↓
+ ┌────┼───────────────┐
+ ↓    ↓               ↓
+Research / Analyze   Implement
+                     ↓
+                    Test
+                     ↓
+                    Debug
+                     ↓
+                    Review
+```
+
+Not:
+
+```text
+User request
+↓
+Implement independently owns project
+↓
+Review independently owns project
+```
+
+If a lower-level skill is useful for one task, use it inside the task assigned by the Manager.
 
 ---
 
-# 4. When to Stay Single-Agent
+# 3. Do Not Compete With Global Project Rules
 
-Prefer a single agent for tasks such as:
+Auto Agent Team does not replace global user or workspace rules.
+
+Global instructions remain authoritative.
+
+If global rules require work such as:
+
+```text
+identify the workspace
+identify the project root
+initialize or read AGENTS.md
+initialize or read PROJECT_LOG.md
+perform required environment checks
+```
+
+those requirements should happen when applicable.
+
+After mandatory global/project preflight is satisfied, Auto Agent Team should continue with orchestration.
+
+Conceptually:
+
+```text
+User / Global Rules
+        ↓
+Mandatory Workspace / Environment Preflight
+        ↓
+Auto Agent Team
+        ↓
+Engineering Orchestration
+```
+
+Do not duplicate project-memory files merely because this skill is active.
+
+Do not create project files when global rules say no local workspace exists.
+
+---
+
+# 4. Invocation Intent
+
+This skill should be strongly preferred when the request contains one or more strong end-to-end signals such as:
+
+```text
+build a complete application
+create a complete software project
+finish an existing project
+repair a project with multiple problems
+implement a substantial feature
+analyze requirements yourself
+fill in reasonable requirements yourself
+split tasks yourself
+decide which agents are needed
+parallelize useful work
+implement and test
+implement and review
+test, debug, and review after implementation
+use an agent team
+use subagents
+coordinate multiple agents
+```
+
+A request does not need to literally mention:
+
+```text
+agent
+subagent
+agent team
+```
+
+to qualify.
+
+Natural-language project intent is enough.
+
+Example:
+
+```text
+Build me a local todo desktop app. Decide the details yourself and make sure it works.
+```
+
+should normally be considered an Auto Agent Team candidate.
+
+---
+
+# 5. When Not to Take Over
+
+Do not invoke full orchestration for simple tasks such as:
 
 ```text
 What is FFT?
 ```
 
 ```text
-Explain these ten lines of code.
+Explain this compiler error.
+```
+
+```text
+Write a short example function.
 ```
 
 ```text
@@ -153,193 +250,122 @@ Rename this variable.
 ```
 
 ```text
-What does this compiler message mean?
+Explain these ten lines of code.
 ```
 
-unless the apparent small task expands into a genuinely multi-module investigation.
+```text
+What is the difference between ADC and DAC?
+```
+
+For small atomic tasks, a direct response or specialized skill is more efficient.
 
 General rule:
 
-> The value of delegation must exceed the coordination cost.
+> Use orchestration when coordination provides real engineering value.
 
 ---
 
-# 5. Understand the Real Deliverable
+# 6. Manager Owns the Workflow
 
-Do not interpret the user's wording mechanically.
+When Auto Agent Team is active, operate as the Manager.
 
-For example:
+Read:
 
 ```text
-Build me a keyboard usage counter.
+references/manager.md
 ```
 
-Reasonable requirements may include:
+Use that file as the detailed Manager playbook.
 
-- an actually runnable application;
-- keyboard event counting;
-- per-key statistics;
-- total key count;
-- persistent local storage;
-- a basic user interface;
-- reset/export capability when appropriate;
-- correct behavior after restart;
-- tests or verification;
-- privacy-preserving behavior.
-
-Prefer sensible defaults when they are:
-
-- conventional;
-- reversible;
-- low-risk;
-- inexpensive;
-- compatible with the existing project.
-
----
-
-# 6. Ask Questions Only When Necessary
-
-Avoid unnecessary clarification loops.
-
-Ask the user only when missing information would materially affect:
-
-- product direction;
-- architecture;
-- safety;
-- privacy;
-- cost;
-- destructive behavior;
-- irreversible changes;
-- external credentials;
-- required hardware;
-- incompatible implementation choices.
-
-Do not interrupt the workflow for minor choices that can be resolved with sensible defaults.
-
----
-
-# 7. Inspect Existing Project Context First
-
-When working inside an existing repository or workspace, inspect relevant context before designing a large solution.
-
-Look for:
+The Manager owns:
 
 ```text
-AGENTS.md
-PROJECT_LOG.md
-README files
-build files
-dependency manifests
-configuration files
-existing tests
-core source files
-project structure
-toolchain configuration
-CI configuration
+goal interpretation
+requirement inference
+project inspection
+complexity assessment
+task decomposition
+dependency analysis
+role selection
+parallelism decisions
+file ownership
+delegation
+integration
+verification
+failure recovery
+review
+final delivery
 ```
 
-Respect existing conventions unless there is a strong reason to change them.
-
-Do not redesign an existing codebase before understanding it.
+The Manager is responsible for the final result.
 
 ---
 
-# 8. Build an Internal Task Graph
+# 7. Build a Dependency-Aware Task Graph
 
-Convert the user goal into an internal dependency-aware task graph.
+For meaningful projects, create an internal Task Graph before large implementation begins.
 
-Each meaningful task should define:
+Each task should identify at least:
 
 ```text
 Task ID
 Objective
-Owner role
+Role
 Dependencies
 Read scope
 Write scope
-Files/modules owned
-Files/modules that must not be edited
+File ownership
 Acceptance criteria
-Required evidence
-Validation command or behavior
-Expected output
+Validation
+Expected evidence
 ```
+
+Use:
+
+```text
+references/task-packet.md
+```
+
+for delegation structure.
 
 Example:
 
 ```text
-T1 - Inspect current repository
-Role: Researcher
-Dependencies: none
-Mode: read-only
+T1 Researcher
+Inspect project and identify constraints.
 
-T2 - Define architecture
-Role: Architect
-Dependencies: T1
+T2 Architect
+Define architecture and shared interfaces.
+Depends on T1.
 
-T3 - Implement input module
-Role: Developer
-Dependencies: T2
-Owns: src/input/*
+T3 Developer
+Implement input module.
+Depends on T2.
+Owns src/input/*.
 
-T4 - Implement storage module
-Role: Developer
-Dependencies: T2
-Owns: src/storage/*
+T4 Developer
+Implement storage module.
+Depends on T2.
+Owns src/storage/*.
 
-T5 - Implement UI
-Role: Developer
-Dependencies: T2
-Owns: src/ui/*
+T5 Developer
+Implement UI module.
+Depends on T2.
+Owns src/ui/*.
 
-T6 - Integrate
-Role: Manager
-Dependencies: T3, T4, T5
+T6 Manager
+Integrate T3, T4, T5.
 
-T7 - Verify behavior
-Role: Tester
-Dependencies: T6
+T7 Tester
+Verify integrated behavior.
 
-T8 - Independent review
-Role: Reviewer
-Dependencies: T7
+T8 Reviewer
+Perform independent review.
 ```
 
 ---
 
-# 9. Respect Dependencies
-
-Separate tasks into two categories.
-
-## Independent tasks
-
-These may run in parallel:
-
-```text
-Inspect repository structure
-Research an external API
-Analyze existing tests
-Review architecture risks
-```
-
-## Dependent tasks
-
-These should run in sequence:
-
-```text
-Design interface
-→ Implement interface
-→ Integrate implementation
-→ Test behavior
-```
-
-Never parallelize tasks merely for appearance.
-
-Correctness is more important than visible concurrency.
-
----
-
-# 10. Select Roles Dynamically
+# 8. Select Agents Dynamically
 
 Available role playbooks:
 
@@ -351,11 +377,33 @@ references/developer.md
 references/debugger.md
 references/tester.md
 references/reviewer.md
+references/task-packet.md
 ```
 
-Available roles:
+Do not activate every role automatically.
+
+Choose the smallest effective team.
+
+Examples:
 
 ```text
+Small:
+Manager
+Developer
+Reviewer
+```
+
+```text
+Medium:
+Manager
+Architect
+Developer
+Tester
+Reviewer
+```
+
+```text
+Large or uncertain:
 Manager
 Researcher
 Architect
@@ -365,241 +413,245 @@ Tester
 Reviewer
 ```
 
-Load and apply only the roles useful for the current task.
+The exact number of agents is an orchestration decision.
 
-Do not create every role for every request.
+The user should not need to specify it.
 
 ---
 
-# 11. Typical Team Sizes
+# 9. Use Real Subagents When Available
 
-Small engineering task:
+If the current Codex environment provides real subagent, delegation, worker, or parallel-agent capability, use it when it provides real value.
+
+Create real subagents for independent work such as:
 
 ```text
-Manager
-Developer
-Reviewer
+repository investigation
+external research
+architecture analysis
+independent modules
+test analysis
+independent review
+multiple debugging hypotheses
 ```
 
-Medium project:
+Each subagent should receive a bounded Task Packet.
+
+Do not create subagents with vague prompts.
+
+Do not create agents merely for appearance.
+
+---
+
+# 10. Prefer Real Parallelism for Independent Tasks
+
+Parallelize only tasks with no blocking dependency.
+
+Good:
 
 ```text
-Manager
-Architect
-Developer
+Researcher A
+→ inspect repository structure
+
+Researcher B
+→ investigate external API
+
 Tester
-Reviewer
+→ inspect existing test coverage
 ```
 
-Large or uncertain project:
+Possible parallel implementation after interfaces are stable:
 
 ```text
-Manager
-Researcher
-Architect
-Developer
-Debugger
-Tester
-Reviewer
+Developer A
+→ src/input/*
+
+Developer B
+→ src/storage/*
+
+Developer C
+→ src/ui/*
 ```
 
-These are examples, not fixed templates.
+Bad:
 
-The governing rule is:
+```text
+Architect still designing interface
+while
+Developer implements against an unknown interface
+```
 
-> Use the smallest effective team that can reliably complete the work.
+Dependency correctness is more important than visible parallel activity.
 
 ---
 
-# 12. Manager Responsibilities
+# 11. Enforce File Ownership
 
-The Manager owns the user's outcome end to end.
+When multiple writing agents work at the same time, assign non-overlapping ownership.
 
-Responsibilities include:
+Preferred:
 
-- understand the final deliverable;
-- infer reasonable requirements;
-- inspect project context;
-- estimate complexity;
-- create the task graph;
-- choose the necessary roles;
-- assign ownership;
-- determine dependencies;
-- decide what can run in parallel;
-- prevent edit conflicts;
-- collect evidence from agents;
-- resolve disagreements;
-- integrate compatible work;
-- reject unnecessary complexity;
-- ensure tests are actually run;
-- trigger debugging when verification fails;
-- request independent review when appropriate;
-- make final integration decisions;
-- communicate one coherent result to the user.
+```text
+Developer A
+src/input/*
 
-The Manager is not a message forwarder.
+Developer B
+src/storage/*
+
+Developer C
+src/ui/*
+```
+
+Avoid:
+
+```text
+Developer A
+app.py
+
+Developer B
+app.py
+```
+
+unless a conflict-safe workflow is explicitly available and deliberately managed.
+
+The Manager owns final integration.
 
 ---
 
-# 13. Researcher Responsibilities
+# 12. If Real Subagents Are Unavailable
 
-Researcher is read-only by default.
+Do not pretend that subagents exist.
 
-Responsibilities:
-
-- inspect repository structure;
-- inspect relevant source files;
-- trace call relationships;
-- examine configuration;
-- inspect dependencies;
-- investigate prior implementations;
-- read documentation;
-- research technical approaches;
-- collect concrete evidence;
-- identify uncertainty and risks.
-
-Researcher output should contain:
+If the environment does not expose real delegation capability, preserve the same engineering roles sequentially:
 
 ```text
-Findings
-Evidence
-Locations
-Implications
-Unknowns
-Recommended next action
+Researcher phase
+↓
+Architect phase
+↓
+Developer phase
+↓
+Tester phase
+↓
+Reviewer phase
 ```
 
-Researcher should not modify production code unless explicitly authorized.
+Never say:
+
+```text
+three agents are running in parallel
+```
+
+unless three real agents were actually created.
+
+Truthfulness is mandatory.
 
 ---
 
-# 14. Architect Responsibilities
+# 13. Researcher
 
-Architect turns requirements and repository constraints into the simplest coherent design.
-
-Responsibilities:
-
-- module boundaries;
-- file responsibilities;
-- public interfaces;
-- data structures;
-- data flow;
-- lifecycle;
-- storage;
-- error handling;
-- dependency direction;
-- integration strategy.
-
-Prefer:
+When investigation is needed, use:
 
 ```text
-simple
-clear
-testable
-compatible
-maintainable
+references/researcher.md
 ```
 
-Avoid unnecessary abstraction and framework churn.
+Researcher should normally be read-only.
+
+Use Researcher for:
+
+```text
+repository inspection
+dependency investigation
+documentation research
+code-path tracing
+constraint discovery
+technical comparison
+uncertainty reduction
+```
+
+Researcher should return evidence, not vague conclusions.
 
 ---
 
-# 15. Developer Responsibilities
+# 14. Architect
 
-Developer implements assigned work.
-
-Rules:
-
-- inspect relevant existing code before editing;
-- stay inside assigned scope;
-- respect file ownership;
-- preserve existing conventions;
-- avoid unnecessary refactoring;
-- do not silently broaden requirements;
-- do not disable tests to make work appear successful;
-- do not hide errors with broad exception handling;
-- add or update tests when behavior changes;
-- run focused validation before returning.
-
-Developer output should include:
+When meaningful architecture decisions are required, use:
 
 ```text
-Files changed
-Behavior implemented
-Tests/checks run
-Results
-Assumptions
-Blockers
-Integration notes
+references/architect.md
 ```
+
+Architect should define:
+
+```text
+module boundaries
+interfaces
+data flow
+state ownership
+lifecycle
+dependency direction
+integration strategy
+validation strategy
+```
+
+Architecture should make parallel implementation easier.
+
+Avoid over-engineering.
 
 ---
 
-# 16. Debugger Responsibilities
+# 15. Developer
 
-Use Debugger when there is:
-
-- build failure;
-- compiler failure;
-- test failure;
-- runtime error;
-- simulation failure;
-- unexpected behavior;
-- integration conflict;
-- user-reported incorrect result.
-
-Debugger workflow:
+Use:
 
 ```text
-Symptom
-   ↓
-Reproduce
-   ↓
-Collect evidence
-   ↓
-Generate plausible causes
-   ↓
-Eliminate unsupported causes
-   ↓
-Identify root cause
-   ↓
-Implement smallest reliable fix
-   ↓
-Add regression coverage when practical
-   ↓
-Verify
+references/developer.md
 ```
 
-Do not use:
+for implementation tasks.
+
+Developer should:
 
 ```text
-Error
-→ Guess
-→ Random edit
+read relevant code first
+stay within assigned scope
+respect file ownership
+preserve project conventions
+implement the smallest reliable change
+update tests when appropriate
+run focused validation
+return evidence
 ```
 
-Prefer evidence-driven root-cause analysis.
+A Developer should not silently redesign the entire project.
 
 ---
 
-# 17. Tester Responsibilities
+# 16. Tester
+
+Use:
+
+```text
+references/tester.md
+```
+
+for verification.
 
 Tester should be independent from implementation when practical.
 
 Tester verifies:
 
-- expected behavior;
-- happy path;
-- edge cases;
-- invalid inputs;
-- error states;
-- lifecycle behavior;
-- restart behavior;
-- persistence;
-- module integration;
-- regressions.
-
-Prefer existing project test infrastructure.
+```text
+happy path
+edge cases
+invalid inputs
+error paths
+lifecycle
+persistence
+integration
+regressions
+```
 
 Relevant verification may include:
 
@@ -611,299 +663,262 @@ integration tests
 lint
 type-check
 static analysis
-manual smoke test
 simulation
+manual smoke test
+hardware verification when available
 ```
 
-Tester must not approve work merely because the code looks correct.
+Do not claim testing occurred unless it actually occurred.
 
 ---
 
-# 18. Reviewer Responsibilities
-
-For meaningful changes, prefer an independent Reviewer.
-
-Reviewer priorities:
-
-1. correctness;
-2. requirement mismatch;
-3. security;
-4. privacy;
-5. state-management problems;
-6. lifecycle bugs;
-7. concurrency bugs;
-8. boundary conditions;
-9. error handling;
-10. test gaps;
-11. maintainability issues likely to cause real defects.
-
-Avoid treating personal style preferences as serious findings.
-
-Each review finding should contain:
-
-```text
-Severity
-Location
-Problem
-Evidence
-Recommended fix
-Suggested regression test
-```
-
----
-
-# 19. Do Not Let Reviewers Approve Their Own Work
-
-For meaningful implementation:
-
-```text
-Developer
-   ↓
-Tester
-   ↓
-Reviewer
-```
-
-The Reviewer should not be the same execution context that authored the implementation when true independent review is available.
-
-Independent review is valuable precisely because it introduces a different perspective.
-
----
-
-# 20. Create Explicit Delegation Packets
-
-Do not delegate with vague instructions such as:
-
-```text
-Write the code.
-```
-
-Instead create a clear task packet.
-
-Example:
-
-```text
-Role: Developer
-
-Objective:
-Implement persistent keyboard usage storage.
-
-Context:
-The application stores aggregate per-key counts locally.
-
-May read:
-src/storage/*
-src/models/*
-tests/storage/*
-
-May edit:
-src/storage/*
-tests/storage/*
-
-Must not edit:
-src/ui/*
-src/input/*
-
-Dependencies:
-Uses the data model defined by Architect.
-
-Acceptance criteria:
-Counts survive application restart.
-
-Required validation:
-Run storage unit tests.
-
-Return:
-Summary, files changed, tests, blockers, integration notes.
-```
+# 17. Debugger
 
 Use:
 
 ```text
-references/task-packet.md
+references/debugger.md
 ```
 
-as the delegation template.
+when verification exposes a failure.
+
+Typical triggers:
+
+```text
+build failure
+compile failure
+test failure
+runtime error
+simulation failure
+incorrect result
+integration failure
+user-reported bug
+```
+
+Preferred loop:
+
+```text
+Failure
+↓
+Reproduce
+↓
+Collect Evidence
+↓
+Hypotheses
+↓
+Root Cause
+↓
+Minimal Fix
+↓
+Regression Test
+↓
+Verification
+```
+
+Do not use random editing as debugging.
 
 ---
 
-# 21. Enforce File Ownership
+# 18. Reviewer
 
-When multiple writing agents work concurrently, avoid file conflicts.
-
-Bad:
+Use:
 
 ```text
-Developer A → app.py
-Developer B → app.py
+references/reviewer.md
 ```
 
-Preferred:
+for meaningful final changes.
+
+Reviewer should ideally be independent from the Developer.
+
+Reviewer focuses on:
 
 ```text
-Developer A → src/input/*
-Developer B → src/storage/*
-Developer C → src/ui/*
+correctness
+requirement alignment
+security
+privacy
+state ownership
+lifecycle
+concurrency
+error handling
+integration risk
+test gaps
 ```
 
-The Manager performs final integration.
+Review is not a substitute for testing.
 
-Do not allow two writing agents to modify the same file concurrently unless the environment provides an explicit conflict-safe workflow and the Manager intentionally chooses it.
+Testing is not a substitute for review.
 
 ---
 
-# 22. Use Native Subagents When Available
+# 19. Failure Recovery Is Part of the Workflow
 
-When Codex exposes real subagent or delegation capability:
+A failed test does not automatically end the project.
 
-- delegate genuinely independent work;
-- give each subagent a complete task packet;
-- assign clear ownership;
-- preserve dependency ordering;
-- collect evidence instead of only conclusions.
-
-Examples of work that may run in parallel:
+Use:
 
 ```text
-Researcher → inspect repository
-Architect → evaluate module boundaries
-Tester → inspect existing test coverage
+Tester finds failure
+↓
+Manager classifies failure
+↓
+Debugger investigates
+↓
+Developer / Debugger fixes
+↓
+Tester re-runs verification
+↓
+Reviewer re-checks when appropriate
 ```
 
-only when those tasks do not depend on unfinished outputs from each other.
+Do not repeatedly retry a failed method without learning from it.
+
+Preserve useful failed-attempt evidence.
 
 ---
 
-# 23. If Native Subagents Are Not Available
+# 20. Respect Project Memory Rules
 
-Do not pretend that multiple agents were created.
-
-Instead preserve the role boundaries sequentially:
+If project/global rules require:
 
 ```text
-Researcher phase
-→ Architect phase
-→ Developer phase
-→ Tester phase
-→ Reviewer phase
+AGENTS.md
+PROJECT_LOG.md
 ```
 
-Do not claim parallel execution if no parallel execution occurred.
+respect them.
 
-Role separation is still useful even when execution is sequential.
+Auto Agent Team itself should not override when those files should or should not exist.
+
+When they exist and are applicable:
+
+```text
+read them
+respect their instructions
+use project history
+record reusable lessons when required by project rules
+```
+
+If they do not apply because no local workspace exists, do not create them merely for orchestration.
 
 ---
 
-# 24. Never Fabricate Agent Activity
+# 21. Do Not Push Orchestration Back to the User
 
-Do not claim:
-
-```text
-Three agents are running in parallel.
-```
-
-unless real subagents were actually created.
-
-Do not claim:
+Do not ask:
 
 ```text
-Tester passed all tests.
+How many agents should I create?
 ```
 
-unless relevant tests were actually executed.
-
-Do not claim:
+Do not ask:
 
 ```text
-Reviewer approved the code.
+Should I use Researcher or Architect?
 ```
 
-unless a real review process occurred.
+Do not ask:
 
-Truthfulness takes priority over impressive orchestration language.
+```text
+Which tasks should run in parallel?
+```
+
+Do not ask:
+
+```text
+Who should review the code?
+```
+
+unless the user explicitly wants manual control.
+
+The Manager should decide these things.
+
+Only ask the user when a missing decision materially affects:
+
+```text
+product direction
+architecture
+safety
+privacy
+destructive behavior
+cost
+required credentials
+required hardware
+irreversible changes
+```
 
 ---
 
-# 25. Resolve Conflicting Agent Recommendations
+# 22. Infer Reasonable Requirements
 
-Agents may disagree.
+For broad requests, fill in reasonable conventional requirements.
 
 Example:
 
 ```text
-Architect recommends SQLite.
-Developer prefers JSON.
-Researcher suggests CSV.
+Build a local todo desktop app.
 ```
 
-Do not preserve every recommendation.
+Reasonable inference may include:
 
-Manager must choose one solution based on:
+```text
+create tasks
+edit tasks
+delete tasks
+mark tasks complete
+local persistence
+basic usable UI
+restart persistence
+basic validation
+tests
+```
 
-- user requirements;
-- existing project architecture;
-- complexity;
-- performance;
-- maintainability;
-- compatibility;
-- testing cost;
-- deployment constraints.
+Do not automatically add:
 
-The final implementation must remain coherent.
+```text
+cloud accounts
+subscription billing
+social features
+advertising
+remote backend
+```
+
+unless needed.
 
 ---
 
-# 26. Integrate Results, Do Not Concatenate Them
+# 23. Do Not Over-Engineer
 
-Bad final integration:
-
-```text
-Agent A said...
-Agent B said...
-Agent C said...
-```
-
-Preferred:
+The goal is not:
 
 ```text
-Agent outputs
-   ↓
-Compare
-   ↓
-Resolve conflicts
-   ↓
-Choose unified design
-   ↓
-Integrate
-   ↓
-Verify
-   ↓
-Deliver
+use as many agents as possible
 ```
 
-The user should receive one engineering result.
+The goal is:
+
+```text
+complete the user's goal reliably
+```
+
+Prefer:
+
+```text
+smallest effective team
+smallest reliable architecture
+smallest justified change
+clear ownership
+real verification
+```
 
 ---
 
-# 27. Verification Gate
+# 24. Verification Gate
 
-Before declaring success, run the most relevant verification available.
+Before declaring the project complete, verify the most important behavior available in the environment.
 
-Possible checks:
-
-```text
-build
-compile
-unit tests
-integration tests
-lint
-type-check
-static analysis
-runtime smoke test
-simulation
-```
-
-Completion should normally require:
+Completion normally requires:
 
 ```text
 Implementation
@@ -911,372 +926,270 @@ Implementation
 Verification
 ```
 
-If verification cannot be performed, explicitly state what was not verified and why.
-
----
-
-# 28. Failure Recovery Loop
-
-When testing fails:
-
-```text
-Tester
-   ↓
-Reports reproducible failure
-   ↓
-Debugger
-   ↓
-Root-cause investigation
-   ↓
-Developer/Debugger fixes
-   ↓
-Tester reruns affected checks
-   ↓
-Reviewer reevaluates
-```
-
-Do not stop after the first failed attempt if the problem is realistically fixable.
-
----
-
-# 29. Build and Runtime Failures
-
-When encountering:
-
-```text
-Build Failed
-Compile Error
-Runtime Error
-Simulation Error
-Test Failed
-```
-
-prefer recording:
-
-```text
-Problem
-Root Cause
-Failed Attempts
-Solution
-Lesson
-```
-
-If the repository contains `PROJECT_LOG.md` and project rules permit it, write reusable debugging lessons there.
-
----
-
-# 30. Avoid Unnecessary Refactoring
-
-If the user asks:
-
-```text
-Add usage statistics.
-```
-
-do not automatically:
-
-```text
-replace the framework
-rewrite the entire application
-replace the build system
-redesign every API
-```
-
-Prefer the smallest reliable change that satisfies the user goal.
-
----
-
-# 31. Do Not Silently Expand Product Scope
-
-Reasonable additions to:
-
-```text
-Build a keyboard usage statistics application.
-```
-
-may include:
-
-```text
-local persistence
-basic UI
-reset button
-statistics display
-```
-
-Do not automatically add:
-
-```text
-cloud accounts
-remote servers
-payment systems
-advertising
-social features
-```
-
-unless clearly justified.
-
----
-
-# 32. Privacy and Safety for Input-Monitoring Projects
-
-For keyboard usage statistics, default to privacy-preserving aggregate data.
-
-Allowed examples:
-
-```text
-per-key press count
-total key count
-usage frequency
-local statistics
-```
-
-Do not default to collecting:
-
-```text
-typed text
-passwords
-chat contents
-financial information
-private messages
-```
-
-Do not add:
-
-```text
-stealth operation
-hidden exfiltration
-concealed persistence
-behavior designed to evade user awareness
-```
-
-The application should be transparent to its user.
-
----
-
-# 33. Keep Internal Orchestration Mostly Internal
-
-Do not dump:
-
-- the entire task graph;
-- every role prompt;
-- every subagent conversation;
-- every intermediate thought;
-
-unless the user explicitly asks to see orchestration details.
-
-The normal final response should focus on:
-
-```text
-What changed
-Important design decisions
-Verification performed
-Known remaining issues
-```
-
----
-
-# 34. Final Response Format
-
-Prefer a concise delivery report such as:
-
-```text
-Completed:
-- Implemented keyboard usage counting.
-- Added local persistent storage.
-- Added statistics UI and reset function.
-
-Verification:
-- Build: passed
-- Tests: 12/12 passed
-- Review: no blocking issues found
-
-Important design:
-- Counts are stored locally.
-- Typed text is never recorded.
-
-Remaining issues:
-- None.
-```
-
-If anything remains unresolved, state it clearly.
-
----
-
-# 35. Never Hide Failure
-
-If the build was not run, say:
-
-```text
-Build has not been verified.
-```
-
-If one test still fails, say:
-
-```text
-One test is still failing.
-```
-
-Do not present incomplete verification as full success.
-
----
-
-# 36. Success Criteria
-
-Auto Agent Team succeeds when:
-
-```text
-Natural-language goal
-   ↓
-Correct understanding
-   ↓
-Reasonable requirement inference
-   ↓
-Useful task decomposition
-   ↓
-Appropriate role selection
-   ↓
-Correct dependency management
-   ↓
-Effective parallelism where possible
-   ↓
-Coherent implementation
-   ↓
-Real verification
-   ↓
-Independent review
-   ↓
-Reliable final delivery
-```
-
-Success is not measured by the number of agents created.
-
----
-
-# 37. Example: Keyboard Usage Counter
-
-User:
-
-```text
-$auto-agent-team Build me a keyboard key usage counter. Fill in reasonable requirements yourself.
-```
-
-Possible task graph:
-
-```text
-T1 Researcher
-Investigate platform-appropriate keyboard event APIs.
-
-T2 Architect
-Design input, storage, and UI modules.
-
-T3 Developer
-Implement keyboard event aggregation.
-
-T4 Developer
-Implement persistent local storage.
-
-T5 Developer
-Implement desktop UI.
-
-T6 Tester
-Create and run verification.
-
-T7 Reviewer
-Review correctness and privacy boundaries.
-
-T8 Manager
-Integrate and perform final validation.
-```
-
-If T3, T4, and T5 have separate file ownership and no blocking dependency, they may run in parallel.
-
-Final flow:
+For meaningful changes, prefer:
 
 ```text
 Implementation
-→ Integration
-→ Test
-→ Debug if needed
-→ Review
-→ Final delivery
++
+Testing
++
+Independent Review
+```
+
+If verification cannot be performed, state exactly what remains unverified.
+
+Do not claim:
+
+```text
+Build passed
+Tests passed
+Review passed
+Hardware verified
+Simulation verified
+```
+
+without evidence.
+
+---
+
+# 25. Internal Orchestration Should Stay Mostly Internal
+
+Do not dump every internal agent prompt and intermediate message to the user.
+
+Normally communicate:
+
+```text
+what was completed
+important decisions
+verification results
+review findings
+remaining issues
+```
+
+If the user asks to see the Agent Team structure, then show:
+
+```text
+task graph
+roles
+dependencies
+parallel tasks
+status
 ```
 
 ---
 
-# 38. Example: Complex Bug-Fixing Task
+# 26. Final Delivery
+
+Preferred final structure:
+
+```text
+Completed:
+- ...
+
+Verification:
+- Build: ...
+- Tests: ...
+- Review: ...
+
+Important decisions:
+- ...
+
+Remaining issues:
+- ...
+```
+
+If something remains unresolved, say so explicitly.
+
+---
+
+# 27. Example: New Application
 
 User:
 
 ```text
-$auto-agent-team This project has many errors. Investigate and fix them.
+Build me a local desktop todo application. Decide reasonable requirements yourself and make sure it works.
+```
+
+Preferred interpretation:
+
+```text
+Auto Agent Team is the top-level owner.
+```
+
+Possible workflow:
+
+```text
+Manager
+↓
+Architect
+↓
+Developer A → application/domain
+Developer B → persistence
+Developer C → UI
+↓
+Manager integration
+↓
+Tester
+↓
+Debugger if needed
+↓
+Reviewer
+↓
+Final delivery
+```
+
+The user should not need to say:
+
+```text
+$auto-agent-team
+```
+
+when implicit invocation is available and the request clearly matches this skill.
+
+---
+
+# 28. Example: Existing Broken Project
+
+User:
+
+```text
+This repository has a lot of problems. Figure them out and fix the project.
 ```
 
 Preferred workflow:
 
 ```text
-Manager
-   ↓
-Researcher A → inspect repository structure
-Researcher B → analyze logs and failures
-Tester       → reproduce failures
-   ↓
+Mandatory global/project preflight
+↓
+Auto Agent Team
+↓
+Researcher A → inspect repository
+Researcher B → inspect logs / failures
+Tester → reproduce problems
+↓
 Manager consolidates evidence
-   ↓
-Debugger → identify root causes
-   ↓
-Developer/Debugger → implement fixes
-   ↓
-Tester → regression verification
-   ↓
-Reviewer → independent review
-   ↓
-Manager → final integration and delivery
+↓
+Debugger
+↓
+Developers
+↓
+Tester
+↓
+Reviewer
+↓
+Manager final integration
 ```
 
 Do not immediately perform broad random edits.
 
 ---
 
-# 39. Example: STM32 Project
+# 29. Example: Embedded Project
 
 User:
 
 ```text
-$auto-agent-team Finish this STM32 inverter project.
+Finish this STM32 inverter project and verify it.
 ```
 
-Possible roles:
+Possible workflow:
 
 ```text
+Global project rules
+↓
+Auto Agent Team
+↓
 Researcher
-→ inspect CubeMX/HAL/project configuration
+→ inspect project / CubeMX / hardware assumptions
 
 Architect
-→ organize control architecture and module boundaries
+→ control and firmware architecture
 
 Developer
-→ PWM / ADC / DMA / control implementation
+→ PWM / ADC / DMA / control / fault handling
 
 Tester
 → build and static verification
 
 Debugger
-→ investigate compiler/runtime issues
+→ compiler or runtime failures
 
 Reviewer
-→ review interrupts, state handling, timing, safety, and edge cases
+→ timing / interrupt / safety / fault review
 ```
 
-Actual roles and agent count must be determined dynamically from the project.
+Actual roles must be selected dynamically.
 
 ---
 
-# 40. Final Principle
+# 30. Success Criteria
 
-Always remember:
+Auto Agent Team succeeds when:
 
-> The user is responsible for describing what they want.
+```text
+User gives natural-language goal
+↓
+Skill is selected for appropriate end-to-end work
+↓
+Manager owns workflow
+↓
+Requirements are reasonably inferred
+↓
+Tasks are decomposed
+↓
+Dependencies are correct
+↓
+Useful subagents are selected
+↓
+Independent tasks run in parallel when possible
+↓
+Results are integrated
+↓
+Failures are debugged
+↓
+Behavior is verified
+↓
+Independent review occurs when appropriate
+↓
+One coherent result is delivered
+```
 
-> The Manager is responsible for determining how the team gets there.
+Success is not measured by how many agents were created.
 
-Do not push project-management work back onto the user.
+---
+
+# Final Principle
+
+Auto Agent Team is the orchestration layer.
+
+Specialized agents and lower-level skills are execution layers.
+
+Global user and project rules remain authoritative.
+
+The intended hierarchy is:
+
+```text
+User Goal
+↓
+Global / Workspace Rules
+↓
+Mandatory Preflight
+↓
+Auto Agent Team
+↓
+Manager
+↓
+Specialized Agents / Lower-Level Skills
+↓
+Integration
+↓
+Verification
+↓
+Review
+↓
+Final Delivery
+```
+
+The user defines the goal.
+
+The Manager owns how the team gets there.
