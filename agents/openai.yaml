@@ -1,0 +1,6 @@
+interface:
+  display_name: "Auto Agent Team"
+  short_description: "Turn broad coding goals into coordinated agent work"
+  default_prompt: "Use $auto-agent-team to turn my high-level software goal into a coordinated, verified implementation."
+policy:
+  allow_implicit_invocation: true
