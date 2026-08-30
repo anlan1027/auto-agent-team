@@ -2,44 +2,47 @@
 
 This directory contains the optional Codex Plugin layer for Auto Agent Team.
 
-The standalone root `SKILL.md` remains the top-level orchestration Skill. This plugin provides a local MCP runtime plus a DSH-style dashboard; it does not install a duplicate Skill.
+The root `SKILL.md` is the orchestration policy. This plugin provides the local MCP Runtime and Dashboard.
 
-## Architecture
+## Core model
+
+Auto Agent Team has two startup gates:
 
 ```text
-User goal
-  ↓
-Auto Agent Team Skill / Manager
-  ↓
-Native Codex subagents
-  ↓
-Agent Team MCP runtime
-  ├─ .agent-team/team.json
-  ├─ dependency/state scheduler
-  └─ native subagent lifecycle ledger
-  ↓
-MCP Apps dashboard
+Gate A — Runtime
+agent_team_get / create / render_dashboard
+
+Gate B — real native Agent Team establishment
+successful native Codex delegation
+→ agent_team_subagent_started
+→ NATIVE_SUBAGENTS
 ```
 
-The host decides where the dashboard is rendered. The plugin cannot force a permanent Codex right-side panel.
+Runtime readiness alone is not permission to start substantive implementation.
 
-## Runtime states
+While `executionMode=UNKNOWN`, the Runtime rejects substantive task transitions to `running` or `done`. Only planning/requirements/orchestration/memory tasks may progress before the native team is established.
 
-The runtime keeps three compatibility states:
+## Execution states
 
 ```text
 UNKNOWN
+= startup
+= Agent Team not established yet
+
 NATIVE_SUBAGENTS
+= at least one real native Codex subagent was successfully delegated and recorded
+= Agent Team established
+= normal successful path
+
 SEQUENTIAL_ROLE_FALLBACK
+= native delegation unavailable/unsupported/failed
+= Agent Team not established
+= emergency single-context backup
 ```
 
-Their meaning is intentionally asymmetric:
+`NATIVE_SUBAGENTS` cannot be set manually. It is established by `agent_team_subagent_started`.
 
-- `UNKNOWN`: startup; native delegation has not been proven yet. Agent Team is not established yet.
-- `NATIVE_SUBAGENTS`: at least one real native Codex subagent was successfully delegated. Agent Team is established. This is the normal successful mode.
-- `SEQUENTIAL_ROLE_FALLBACK`: native delegation was genuinely unavailable or failed. Agent Team is **not** established. This is emergency single-context backup only.
-
-The dashboard must never present fallback as another healthy multi-agent mode. It displays fallback as **Agent Team unavailable / not established**.
+Fallback requires a concrete `reason`; the Runtime stores it as `fallbackReason`.
 
 ## Runtime tools
 
@@ -54,57 +57,61 @@ The dashboard must never present fallback as another healthy multi-agent mode. I
 - `agent_team_append_event`
 - `agent_team_render_dashboard`
 
-The runtime is local and has no npm dependencies beyond Node.js itself.
+## Runtime enforcement
 
-## Native Codex subagent tracking
+The Runtime enforces:
 
-A real Codex subagent is tracked separately from the logical team role. For example:
+- new team state starts `UNKNOWN`;
+- assigned tasks must map to logical members;
+- substantive tasks cannot enter `running`/`done` while `UNKNOWN`;
+- `NATIVE_SUBAGENTS` cannot be manually asserted;
+- fallback requires concrete failure evidence;
+- linked tasks cannot be completed while a native subagent is still running;
+- active native subagents prevent final convergence;
+- duplicate native display names prefer the latest active record when finishing by name.
 
-```text
-Codex display name: Wegener
-Logical role:       Reviewer
-Runtime member:     reviewer
-Runtime task:       t4
-```
+This does not intercept arbitrary filesystem edits made outside Runtime tools, so the Skill/Manager instructions also enforce the same establishment gate at the orchestration layer.
 
-When a native delegation succeeds, the Manager records it with `agent_team_subagent_started`. When it returns, fails, or is cancelled, the Manager records the terminal result with `agent_team_subagent_finished`.
+## Native lifecycle
 
-Active native subagents are a completion gate. The runtime does not allow a linked task to be marked done while its native subagent is still running, and final native Agent Team completion requires:
-
-```text
-executionMode = NATIVE_SUBAGENTS
-all current tasks are done
-active native subagents = 0
-required verification is complete
-blocking review findings are resolved
-```
-
-A fallback run may still finish the software task, but its final report must say that a real Agent Team was not established.
-
-## Logical team integrity
-
-Runtime task assignees should map to logical members. A state such as:
+After successful delegation:
 
 ```text
-4 assigned tasks
-0 logical members
+agent_team_subagent_started
+  name = Codex display name
+  role = logical role
+  memberId = logical member when mapped
+  taskId = Runtime task when mapped
 ```
 
-is invalid orchestration even if the tasks themselves can run. The Manager should create the smallest logical team that matches the task graph.
-
-## Review remediation loop
-
-Review is not automatically equivalent to project completion. Blocking findings should append follow-up work such as:
+On return/failure/cancellation:
 
 ```text
-Fix review findings
-→ Regression verification
-→ Re-review
+agent_team_subagent_finished
 ```
 
-The scheduler can reopen a previously completed workflow when new remediation tasks are added.
+Example:
 
-## Runtime verification
+```text
+name: Wegener
+role: Reviewer
+```
+
+## Dashboard semantics
+
+The Dashboard distinguishes:
+
+```text
+⚪ 正在建立 Agent Team
+🟢 Agent Team 已建立
+🔴 Agent Team 未建立
+```
+
+`UNKNOWN` explicitly warns that substantive implementation/testing/debugging/review must not begin before a native subagent starts.
+
+Fallback displays the recorded failure evidence.
+
+## Verification
 
 Run:
 
@@ -112,12 +119,25 @@ Run:
 node ./scripts/smoke-test.mjs
 ```
 
-The smoke test verifies fresh-workspace behavior, native-subagent lifecycle tracking, execution-mode switching, linked-task completion gating, dependency scheduling, final member convergence, dashboard Agent Team establishment semantics, and remediation reopening.
+The smoke test verifies:
+
+- schema/version;
+- fresh workspace behavior;
+- logical-member validation;
+- the second establishment gate;
+- rejection of manual native-mode claims;
+- real native lifecycle switching;
+- concurrent Tester/Reviewer tracking;
+- linked-task completion protection;
+- evidence-backed fallback;
+- Dashboard establishment/fallback messaging.
 
 ## State
 
-Team state is written only under the selected workspace:
+Runtime state is written only under the selected workspace:
 
 ```text
 .agent-team/team.json
 ```
+
+The Codex host decides where the MCP App Dashboard is rendered.
