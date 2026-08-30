@@ -6,118 +6,157 @@
 
 An automatic multi-agent engineering orchestrator for OpenAI Codex.
 
-The user only needs to describe the goal. Auto Agent Team analyzes requirements, decomposes the work, selects roles, uses native Codex subagents when appropriate, coordinates parallel work, integrates code, runs verification, debugs failures, and performs independent review.
-
-Starting with v0.2.0, the project also provides an optional **Codex Plugin + MCP Runtime + Agent Team Dashboard** for displaying DSH AgentTeams-style members, tasks, dependencies, progress, verification, and review state.
+**v0.3.0** focuses on a simple model: the user describes a project goal, the Manager analyzes requirements, builds the task graph, uses real native Codex subagents by default for suitable independent work, and keeps members, tasks, dependencies, native-agent lifecycle, verification, and review visible through the local Runtime and Dashboard.
 
 ---
 
-## What You Get
+## Workflow
 
 ```text
-Natural-language goal
+Natural-language project request
 ↓
-Auto Agent Team Skill
+Auto Agent Team implicit trigger
 ↓
-Manager
+Workspace / project rules
 ↓
-Task graph / dependencies
+Manager builds logical team + main task graph
 ↓
-Native Codex Subagents
-├─ Researcher
+Auto Agent Team Runtime + Dashboard
+↓
+Native Codex Agent Team by default
+├─ Researcher / Explorer
 ├─ Architect
 ├─ Developer
 ├─ Tester
 ├─ Debugger
 └─ Reviewer
 ↓
-Integration / verification / review
+Manager integration
+↓
+Real build / test / debug
+↓
+Independent native Reviewer
+↓
+Fix / regression / re-review
 ↓
 Final delivery
 ```
 
-With the optional Plugin installed:
-
-```text
-Manager / Subagents
-↓
-Agent Team MCP Runtime
-↓
-.agent-team/team.json
-↓
-DSH-style Agent Team Dashboard
-```
+The user should not need to choose the agent count, roles, execution order, or parallelism manually.
 
 ---
 
-## Core Idea
+## Native Agent Team by Default
 
-The user should not need to manually:
+For complete projects and suitable independent work, Auto Agent Team defaults to the host's real native Codex subagent capability, such as `spawn_agent`, `collaboration.spawn_agent`, native multi-agent spawn, or an equivalent internal child-agent operation.
 
-- split the project into tasks;
-- decide how many agents are required;
-- remember agent names;
-- arrange execution order;
-- coordinate parallel work;
-- organize testing, debugging, and review.
+A real native subagent is an internal child execution context of the current Manager, not a normal top-level conversation.
 
-The user should only need to say:
-
-> What I want to build.
-
-Auto Agent Team handles:
+These do **not** count as native subagents:
 
 ```text
-Understand the goal
-→ Inspect the project
-→ Infer reasonable requirements
-→ Build a task graph
-→ Select the smallest effective team
-→ Use native Codex subagents
-→ Parallelize independent work
-→ Integrate results
-→ Test
-→ Debug
-→ Independent review
-→ Final delivery
+create_thread
+fork_thread
+handoff_thread
+new normal chat / top-level task
+cross-task delegation
+“Sent by ChatGPT/Codex from another task”
+loading a role markdown file
+loading another Skill
+same-context role playing
+self-review
 ```
 
----
-
-## What Counts as a Real Subagent
-
-Auto Agent Team prefers the **native Codex subagent / delegation workflow**.
-
-Valid:
-
-```text
-Manager
-├─ Native Architect Subagent
-├─ Native Developer Subagent
-├─ Native Tester Subagent
-└─ Native Reviewer Subagent
-```
-
-The following do not count as real agents:
-
-```text
-Reading reviewer.md
-Loading another Skill
-Switching the main agent's role
-Self-review
-Naming a phase "Developer Agent"
-Manually creating unrelated top-level chats to imitate agents
-```
-
-If Codex surfaces native agent threads in its own Subagents/background-agent activity area, that is normal. It is different from manually creating unrelated top-level conversations to simulate agents.
-
-If the current environment truly cannot invoke native subagents, Auto Agent Team uses:
+Only when real native spawning is unavailable, disabled, unsupported, or an actual spawn attempt fails may the runtime use the internal state:
 
 ```text
 SEQUENTIAL_ROLE_FALLBACK
 ```
 
-and explicitly states that no real multi-agent delegation occurred.
+The Dashboard presents that state as:
+
+```text
+Single-Agent Backup
+```
+
+It is not the default Agent Team mode.
+
+---
+
+## Runtime and Dashboard
+
+The optional Plugin provides a local MCP Runtime. Team state is stored in the current workspace:
+
+```text
+.agent-team/
+└── team.json
+```
+
+The Runtime currently exposes 10 tools:
+
+```text
+agent_team_create
+agent_team_get
+agent_team_set_execution_mode
+agent_team_add_task
+agent_team_subagent_started
+agent_team_subagent_finished
+agent_team_update_member
+agent_team_update_task
+agent_team_append_event
+agent_team_render_dashboard
+```
+
+The Dashboard can show:
+
+- phase: Plan → Execute → Verify → Review → Complete;
+- native multi-agent vs single-agent backup execution;
+- logical members and current status;
+- active and recorded native agents;
+- native display name, logical role, task, result, and evidence;
+- task dependencies and status;
+- fixed main-task progress;
+- dynamic follow-up tasks;
+- test / verification results;
+- review / re-review results;
+- recent Runtime activity.
+
+### Main Tasks and Dynamic Follow-up Tasks
+
+Tasks created with the initial team are treated as **main tasks**. The top-level progress remains stable, for example:
+
+```text
+Main tasks 8/9
+```
+
+Bug fixes, regression tests, review fixes, re-review work, and other items later added with `agent_team_add_task` are displayed separately as **dynamic follow-up tasks**, so the main-task denominator does not keep growing.
+
+---
+
+## Native Agent Lifecycle
+
+After a real native spawn succeeds, the Manager records:
+
+```text
+agent_team_subagent_started
+```
+
+When that native agent completes, fails, or is cancelled, the Manager records:
+
+```text
+agent_team_subagent_finished
+```
+
+Example:
+
+```text
+name: Heisenberg
+role: Architect
+task: T1
+status: running → done
+```
+
+The Runtime treats real native-agent start as evidence for `NATIVE_SUBAGENTS` and prevents linked tasks from being completed while a native agent is still active.
 
 ---
 
@@ -125,19 +164,15 @@ and explicitly states that no real multi-agent delegation occurred.
 
 | Role | Responsibility |
 |---|---|
-| Manager | Understand goals, decompose work, delegate, manage dependencies, integrate, deliver |
-| Researcher | Investigate repositories, documentation, dependencies, and technical options |
-| Architect | Architecture, module boundaries, interfaces, data flow, state lifecycle |
-| Developer | Implement and modify code |
-| Debugger | Reproduce problems, find root causes, fix, and verify regressions |
-| Tester | Design and execute verification, edge cases, and error-path testing |
-| Reviewer | Independently review correctness, security, maintainability, and test gaps |
+| Manager | Requirements, task graph, delegation, coordination, integration, final delivery |
+| Researcher | Repository, documentation, dependency, and technical research |
+| Architect | Architecture, boundaries, interfaces, data flow, state design |
+| Developer | Bounded implementation work |
+| Debugger | Reproduction, root-cause investigation, fixes, regression |
+| Tester | Build, test, edge-case, and failure-path verification |
+| Reviewer | Independent correctness, security, maintainability, and test-gap review |
 
-Not every role is activated for every task.
-
-The governing principle is:
-
-> Use the smallest effective team that can reliably complete the work while preserving independence where it matters.
+Not every role is forced into every project. The goal is the smallest effective team that preserves useful independence.
 
 ---
 
@@ -145,10 +180,10 @@ The governing principle is:
 
 The project has two layers:
 
-1. **Auto Agent Team Skill** — core orchestration rules; recommended.
-2. **Auto Agent Team Plugin** — optional MCP Runtime and Dashboard.
+1. **Auto Agent Team Skill** — core orchestration rules.
+2. **Auto Agent Team Plugin** — MCP Runtime + Dashboard.
 
-## 1. Install the Skill
+## Install / Update the Skill
 
 Default Windows path:
 
@@ -156,20 +191,20 @@ Default Windows path:
 C:\Users\YourName\.agents\skills\auto-agent-team
 ```
 
-PowerShell:
+First install:
 
 ```powershell
 cd "$env:USERPROFILE\.agents\skills"
 git clone https://github.com/anlan1027/auto-agent-team.git auto-agent-team
 ```
 
-Update an existing installation:
+Update:
 
 ```powershell
 git -C "$env:USERPROFILE\.agents\skills\auto-agent-team" pull
 ```
 
-If GitHub access requires a Clash proxy, for example port `7897`:
+With a Clash proxy, for example port 7897:
 
 ```powershell
 git -C "$env:USERPROFILE\.agents\skills\auto-agent-team" `
@@ -178,159 +213,57 @@ git -C "$env:USERPROFILE\.agents\skills\auto-agent-team" `
     pull
 ```
 
-Fully restart Codex after updating.
-
----
-
-## 2. Install the Optional Agent Team Plugin
-
-The repository includes:
-
-```text
-install-plugin.ps1
-```
-
-It will:
-
-- validate the Plugin manifest and MCP configuration;
-- run an MCP Server syntax check when Node.js is available;
-- install the Plugin to `~/plugins/auto-agent-team`;
-- create or merge `~/.agents/plugins/marketplace.json`;
-- preserve existing plugins;
-- avoid installing a duplicate Auto Agent Team Skill.
-
-Run:
+## Install / Update the Plugin
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.agents\skills\auto-agent-team\install-plugin.ps1"
 ```
 
-Then fully restart Codex.
-
-If Codex shows the plugin as available rather than enabled, open the **Plugins** page, find `Auto Agent Team`, and install/enable it once.
-
----
-
-# Agent Team Dashboard
-
-The Plugin runtime exposes these tools:
+The installer validates the manifest and MCP configuration, runs the Runtime smoke test, and installs the plugin to:
 
 ```text
-agent_team_create
-agent_team_get
-agent_team_update_member
-agent_team_update_task
-agent_team_append_event
-agent_team_render_dashboard
+C:\Users\YourName\plugins\auto-agent-team
 ```
 
-Team state is stored in the current workspace:
-
-```text
-.agent-team/
-└── team.json
-```
-
-The schema is inspired by DSH AgentTeams:
-
-```text
-team
-├─ id
-├─ name
-├─ description
-├─ executionMode
-├─ phase
-├─ members[]
-│  ├─ id
-│  ├─ name
-│  ├─ role
-│  ├─ agentProfile
-│  ├─ status
-│  ├─ currentTask
-│  └─ summary
-├─ tasks[]
-│  ├─ id
-│  ├─ subject
-│  ├─ assignee
-│  ├─ status
-│  ├─ dependencies
-│  ├─ objective
-│  ├─ acceptance
-│  ├─ verify
-│  ├─ deliverables
-│  ├─ result
-│  └─ evidence
-└─ events[]
-```
-
-The Dashboard currently shows:
-
-- team name and phase;
-- execution mode;
-- members and statuses;
-- current task;
-- task dependencies;
-- completion progress;
-- task results;
-- recent activity;
-- automatic/manual refresh.
-
----
-
-## About a DSH-style Fixed Right-side Panel
-
-Auto Agent Team Dashboard uses UI containers provided by Codex Plugin / MCP Apps.
-
-It can provide a DSH-style interface, but **the final placement is controlled by the Codex Host**.
-
-The project does not modify the Codex client shell and cannot guarantee a permanently pinned native right-side panel.
-
-Possible host presentation modes include:
-
-```text
-inline
-fullscreen
-picture-in-picture
-other App UI containers supported by Codex
-```
-
-The goal is to approximate the DSH team-status experience without relying on brittle UI injection into the Codex client itself.
+Fully restart Codex after updating.
 
 ---
 
 # Usage
 
-You normally do not need to explicitly type the Skill name.
+You normally do not need to type `$auto-agent-team` explicitly.
 
 Example:
 
 ```text
-Build me a local desktop todo application. Fill in reasonable requirements yourself, split the work, implement it, test it, and perform an independent code review.
+Build a complete Windows local API management tool. Fill in reasonable requirements and technology choices yourself, then implement it, run real tests, fix problems, and perform an independent code review.
 ```
 
-You can also invoke it explicitly:
-
-```text
-$auto-agent-team Finish this project. Analyze it yourself, split the tasks, use suitable agents, then verify and review the result.
-```
-
-When the Plugin Runtime is enabled, the Manager can keep team state synchronized and render the Dashboard when useful.
+Project-scale requests should enter Auto Agent Team orchestration automatically. Small explanations, isolated snippets, and tiny edits do not need a full team.
 
 ---
 
-# Task Decomposition Rules
+## Dashboard Placement
 
-1. Do not overuse Agent Team for trivial atomic tasks.
-2. Build dependency graphs for complete projects and complex work.
-3. Parallelize tasks that have no dependencies.
-4. Preserve correct order for dependent tasks.
-5. Prefer non-overlapping file ownership for parallel writing agents.
-6. Keep Reviewer independent from the implementation context when possible.
-7. The Manager owns final integration.
-8. Do not merely concatenate agent outputs into the final solution.
-9. Run real verification after implementation.
-10. When verification fails, identify the root cause before fixing and regression testing.
-11. Never claim agent, test, review, or debug activity that did not actually happen.
+The Dashboard uses UI containers supplied by Codex Plugin / MCP Apps. Final placement is controlled by the Codex Host and may be inline, fullscreen, picture-in-picture, or another supported container.
+
+The project does not modify the Codex client shell, so it cannot guarantee a permanently pinned native right-side panel.
+
+---
+
+# Engineering Truthfulness
+
+Auto Agent Team must not claim work that did not actually happen:
+
+```text
+No native spawn → do not claim a native Agent
+Normal Task / chat → do not record as a native Agent
+Tests not run → do not claim they passed
+Manager self-review → do not call it independent review
+No evidence → do not state a root cause as fact
+```
+
+Independent review requires a separate real native Reviewer execution context.
 
 ---
 
@@ -340,6 +273,7 @@ When the Plugin Runtime is enabled, the Manager can keep team state synchronized
 auto-agent-team/
 ├── README.md
 ├── README_EN.md
+├── CHANGELOG.md
 ├── LICENSE
 ├── SKILL.md
 ├── install-plugin.ps1
@@ -354,41 +288,14 @@ auto-agent-team/
 │   ├── tester.md
 │   ├── reviewer.md
 │   └── task-packet.md
-├── .agents/
-│   └── plugins/
-│       └── marketplace.json
-└── plugins/
-    └── auto-agent-team/
-        ├── .codex-plugin/
-        │   └── plugin.json
-        ├── .mcp.json
-        ├── README.md
-        ├── mcp/
-        │   └── server.mjs
-        └── ui/
-            └── team-dashboard.html
-```
-
----
-
-# Privacy and Truthfulness
-
-For input-monitoring projects such as keyboard statistics, default to aggregate statistics and do not record by default:
-
-```text
-passwords
-chat contents
-complete typed text
-sensitive information
-```
-
-Auto Agent Team must also remain truthful about engineering activity:
-
-```text
-No real Subagent → do not claim one existed
-Tests not executed → do not claim they passed
-Self-review → do not call it independent review
-No evidence → do not state a root cause as fact
+├── .agents/plugins/marketplace.json
+└── plugins/auto-agent-team/
+    ├── .codex-plugin/plugin.json
+    ├── .mcp.json
+    ├── README.md
+    ├── mcp/server.mjs
+    ├── scripts/smoke-test.mjs
+    └── ui/team-dashboard.html
 ```
 
 ---
@@ -396,23 +303,22 @@ No evidence → do not state a root cause as fact
 # Current Version
 
 ```text
-v0.2.0
+v0.3.0
 ```
 
-Current focus:
+v0.3.0 focuses on:
 
 ```text
-Natural-language goal
-→ Manager orchestration
-→ Native Codex Subagents
-→ Task dependencies and parallelism
-→ Implementation / Testing / Debug / Review
-→ Agent Team Runtime
-→ DSH-style Dashboard
-→ Final delivery
+project-scale implicit triggering
+→ Runtime startup
+→ native Agent Team as the default execution path
+→ truthful native-agent lifecycle tracking
+→ dependencies / parallelism / verification / review
+→ fixed main-task progress + dynamic follow-up tasks
+→ single-Agent execution only as backup after real native failure
 ```
 
-The Plugin Dashboard is still experimental, and its exact UI presentation depends on the MCP Apps / Plugin UI capabilities supported by the current Codex Host.
+See `CHANGELOG.md` for release notes.
 
 ---
 
