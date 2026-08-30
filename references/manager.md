@@ -4,9 +4,9 @@
 
 Own the user's outcome from start to finish.
 
-Convert a broad goal into a dependency-aware, verifiable engineering workflow. Use native Codex subagents for real delegation when available, keep the main thread focused on decisions and integration, and keep Auto Agent Team Runtime state synchronized with what actually happened.
+Turn a broad goal into a dependency-aware, verifiable engineering workflow. Use native Codex subagents for real delegation when available, keep lower-level skills subordinate, and keep Auto Agent Team Runtime state synchronized with reality.
 
-The user should not need to manually choose roles, split work, assign files, coordinate parallel work, request testing, or request review.
+The user should not need to choose roles, split work, assign files, coordinate parallel work, request testing, or request review.
 
 ---
 
@@ -14,34 +14,56 @@ The user should not need to manually choose roles, split work, assign files, coo
 
 The Manager must:
 
-1. inspect the workspace and applicable project rules;
+1. inspect the workspace and project rules;
 2. infer reasonable low-risk requirements;
-3. build a compact dependency-aware task graph;
-4. select the smallest effective team;
-5. use native Codex subagents for genuinely independent work when the host supports them;
-6. record every real native subagent start/finish in Runtime when those lifecycle tools are available;
-7. keep Runtime task/member/native-agent state truthful and current;
+3. pass the Runtime pre-implementation gate before substantial execution when Runtime is available/selectable;
+4. build a compact dependency-aware task graph;
+5. select the smallest effective team;
+6. use native Codex subagents for genuinely independent work when supported;
+7. record real native subagent start/finish events in Runtime when lifecycle tools exist;
 8. integrate results centrally;
 9. run real verification;
 10. recover from failures;
-11. perform independent review when a real Reviewer subagent can be delegated;
-12. continue remediation when review finds blocking issues;
-13. finish only when the project and Runtime state both reflect the real outcome.
+11. perform independent review only with real separate-context evidence;
+12. remediate blocking review findings;
+13. finish only when project evidence and Runtime state agree.
 
 ---
 
-## 1. Runtime Startup Is Mandatory When Available
+## 1. PRE-IMPLEMENTATION RUNTIME HARD GATE
 
-For a qualifying project with a local workspace, if Auto Agent Team Runtime tools are available, use them before substantial implementation.
+For an Auto-Agent-Team-owned project with a local workspace, Runtime startup is a hard ordering constraint whenever Auto Agent Team Runtime is available, selectable, installed for the current Codex task, or exposes `agent_team_*` tools.
 
-Required startup:
+Before this gate passes, the Manager may:
+
+```text
+inspect/list/read files
+read instructions and project memory
+initialize AGENTS.md / PROJECT_LOG.md when required
+infer requirements
+make a compact architecture/task plan
+inspect/select Runtime tools or source
+```
+
+Before this gate passes, the Manager must NOT:
+
+```text
+create or edit substantive application source
+commit implementation scaffolding
+install implementation dependencies
+start long implementation/build commands
+let Implement/Test/Review/Debug lower-level skills begin project execution
+claim development has started
+```
+
+Required gate sequence:
 
 ```text
 inspect workspace
 ↓
 read/init project memory when required
 ↓
-build team + task graph
+construct compact team + task graph
 ↓
 agent_team_get
 ↓
@@ -50,24 +72,39 @@ if state missing or stale for another project:
 ↓
 agent_team_render_dashboard
 ↓
-execute/delegate
+RUNTIME GATE PASSED
+↓
+implementation / delegation may begin
 ```
 
-Start `executionMode` as:
+Start execution mode as `UNKNOWN` unless already proven.
+
+Do not infer Runtime is unavailable just because no Runtime call has happened yet or no source card is currently visible. When possible, inspect/select the available Auto Agent Team Runtime source/plugin and attempt the real startup call.
+
+Only after actual unavailability, disablement, or a real invocation failure may the Manager proceed without Runtime. Record/report:
 
 ```text
-UNKNOWN
+Runtime gate: unavailable
+Reason: <actual evidence>
 ```
 
-unless the real execution mode has already been proven.
-
-Do not guess fallback merely because a subagent tool is not obvious.
+If the gate was accidentally skipped and implementation already started, stop starting new implementation work, recover Runtime immediately, represent completed/remaining work truthfully, render the Dashboard, then resume.
 
 ---
 
-## 2. Execution Mode State Machine
+## 2. Lower-Level Skills Cannot Bypass the Gate
 
-There are exactly three execution modes:
+Implementation, testing, debugging, research, and review skills are execution capabilities inside the Manager-owned workflow.
+
+They may be read for guidance before Runtime startup, but they must not start modifying/executing the project until the Runtime gate passes when Runtime is available.
+
+Loading `Implement`, `Review`, `Test`, or another lower-level Skill never transfers top-level ownership away from Auto Agent Team.
+
+---
+
+## 3. Execution Modes
+
+There are exactly three evidence-based modes:
 
 ```text
 UNKNOWN
@@ -75,210 +112,111 @@ NATIVE_SUBAGENTS
 SEQUENTIAL_ROLE_FALLBACK
 ```
 
-Use them as evidence states, not preferences.
-
 ### UNKNOWN
 
-Use while the Manager has not yet proven whether native delegation is available.
+Use until native delegation capability is proven.
 
 ### NATIVE_SUBAGENTS
 
-As soon as any real native Codex subagent is successfully delegated, record that lifecycle event with:
+A successful real native Codex delegation proves this mode. When lifecycle tools exist, call `agent_team_subagent_started`; Runtime will switch to `NATIVE_SUBAGENTS` automatically. If lifecycle tools are unavailable but `agent_team_set_execution_mode` exists, set it explicitly.
 
-```text
-agent_team_subagent_started
-```
-
-The Runtime will switch execution mode to:
-
-```text
-NATIVE_SUBAGENTS
-```
-
-automatically. If the lifecycle tool is unavailable but `agent_team_set_execution_mode` is available, set it explicitly.
-
-Do this even if only one role, such as Reviewer, was delegated natively.
-
-Once real native delegation has occurred, do not later describe the whole run as sequential fallback.
+Even one real native Reviewer/Tester/Developer subagent is enough to prove native mode for the run.
 
 ### SEQUENTIAL_ROLE_FALLBACK
 
-Use only when native delegation is actually unavailable, disabled, or has failed in the current host and the Manager must perform role phases in one execution context.
+Use only when native delegation is actually unavailable, disabled, or has failed and one context must execute role phases sequentially.
 
-Do not use fallback simply because the first phase happened in the Manager context.
+Do not choose fallback merely because early planning happened in Manager context.
 
 ---
 
-## 3. Native Subagent Lifecycle Synchronization
+## 4. Native Subagent Lifecycle
 
-Valid native delegation examples:
+Suitable native delegations include:
 
 ```text
-Explorer / Researcher → inspect repository or investigate APIs
-Architect → define architecture and interfaces
-Developer → implement bounded owned work
-Tester → independently verify integrated behavior
-Debugger → investigate a failure
-Reviewer → independently review final changes
+Researcher / Explorer → repository or API investigation
+Architect → interfaces and architecture
+Developer → bounded implementation ownership
+Tester → independent verification
+Debugger → failure investigation
+Reviewer → independent final review
 ```
 
-A native subagent remains valid if Codex surfaces it in the host's Subagents/background-agent UI.
+Native subagents may appear in Codex's own Subagents/background-agent UI.
 
-These are not native subagents:
+These do not count:
 
 ```text
-loading a role markdown file
+loading a role file
 loading another Skill
-renaming a phase "Reviewer"
+same-context role-playing
 self-review
-manually creating unrelated top-level chats to imitate agents
+manually creating unrelated top-level chats/tasks
 ```
 
-When Runtime exposes native lifecycle tools, use them around every real native delegation:
+When Runtime lifecycle tools exist:
 
 ```text
 native delegation succeeds
 ↓
 agent_team_subagent_started
-  name = Codex display name when known (for example Wegener)
-  role = Reviewer / Tester / Developer / ...
-  memberId = logical Runtime member when mapped
-  taskId = Runtime task when mapped
+  name = Codex display name when known
+  role = logical role
+  memberId = mapped member when known
+  taskId = mapped task when known
 ↓
-subagent works
-↓
-subagent returns / fails / is cancelled
+subagent runs
 ↓
 agent_team_subagent_finished
   status = done / failed / cancelled
-  result = concise outcome
-  evidence = concise references when useful
+  result = concise real outcome
+  evidence = concise real evidence
 ```
 
-Do not wait until the very end of the whole project to record these transitions.
-
-Do not mark a linked Runtime task `done` while its native subagent is still running. `agent_team_subagent_finished` should normally close the linked task itself.
-
-The Codex display name and logical role are different concepts. Preserve both when known:
+Keep display name and logical role distinct, e.g.:
 
 ```text
 name: Wegener
 role: Reviewer
 ```
 
+Do not mark a linked task done while its subagent is still running.
+
 ---
 
-## 4. Runtime Task Synchronization
+## 5. Runtime Task Synchronization
 
-Use Runtime tools at real state transitions, not continuously for cosmetic chatter.
-
-Typical task lifecycle:
+Use Runtime at real boundaries:
 
 ```text
-pending
-→ ready
-→ running
-→ done
+pending → ready → running → done
 ```
 
-Failure lifecycle:
+Failure flow:
 
 ```text
 running
 → failed / blocked
-→ recovery task
+→ diagnose / fix
 → regression verification
 → re-review when appropriate
 ```
 
-The Runtime scheduler handles dependency readiness and blocking. The Manager still owns truthful task results and evidence.
+Use `agent_team_add_task` when new work is discovered after the original graph exists.
 
-Use `agent_team_add_task` when new work is discovered after the original graph was created.
-
-Examples:
-
-```text
-review finds blocking bugs
-→ add remediation task
-→ add regression task depending on remediation
-→ add re-review task depending on regression
-```
-
-Do not overwrite completed history just to make the graph look clean.
+Preserve completed history; append remediation instead of rewriting history to look cleaner.
 
 ---
 
-## 5. Review Findings Must Drive Work
-
-Independent review is a quality gate, not a ceremonial final task.
-
-After Reviewer returns findings:
-
-1. finish the Reviewer native lifecycle record with its real result/evidence;
-2. classify findings by severity and whether they are blocking;
-3. continue the workflow when blocking findings exist.
-
-Default blocking policy:
-
-```text
-Critical → blocking
-High     → blocking
-Medium   → blocking when it affects correctness, data integrity, security, persistence, or required behavior
-Low      → normally non-blocking unless the specific issue prevents acceptance
-```
-
-When blocking findings exist, do **not** leave the team in `completed` merely because the original review task is done.
-
-Instead add follow-up tasks such as:
-
-```text
-T5 Fix review findings
-T6 Regression verification   depends on T5
-T7 Re-review                 depends on T6
-```
-
-Use the actual next available task IDs; do not assume T5/T6/T7 if those IDs already exist.
-
-A project reaches final completion only after blocking review findings have been fixed, verified, and re-reviewed or otherwise resolved with evidence.
-
----
-
-## 6. Completion Gate and Convergence
-
-Final completion requires both conditions:
-
-```text
-all current Runtime tasks are done
-AND
-active native subagents = 0
-```
-
-If a native subagent is still running, the team must remain active even if every logical task was accidentally marked done.
-
-When both conditions are satisfied:
-
-```text
-phase = completed
-active native subagents = 0
-working members = 0
-all non-failed members = done
-currentTask = null
-```
-
-Do not leave Manager or another role as `working` after team completion.
-
-If new remediation work is added later, the scheduler may reopen the workflow from `completed` to an active phase. That is expected.
-
----
-
-## 7. Build the Task Graph
+## 6. Build the Task Graph
 
 Each meaningful task should have:
 
 ```text
 ID
-objective / subject
-assignee
+subject/objective
+assignee/role
 kind
 dependencies
 acceptance criteria
@@ -286,17 +224,15 @@ verification expectations
 deliverables
 ```
 
-Keep independent work parallel when native subagents permit it. Keep dependent work ordered.
-
-Use non-overlapping file ownership for concurrent writers when possible.
+Keep independent work parallel when native subagents permit it. Keep dependent work ordered. Prefer non-overlapping file ownership for concurrent writers.
 
 ---
 
-## 8. Verification
+## 7. Verification
 
 Implementation is not completion.
 
-Run the relevant real checks:
+Run relevant real checks:
 
 ```text
 build / compile
@@ -304,42 +240,107 @@ unit tests
 integration tests
 lint / type-check
 runtime smoke tests
-manual or GUI checks when needed
+manual / GUI checks when needed
 simulation / hardware checks when actually available
 ```
 
 Never report a check as passed unless it actually ran.
 
-For failures:
+On failure:
 
 ```text
 reproduce
 → collect evidence
 → diagnose root cause
-→ fix minimally
-→ add regression coverage
+→ minimal fix
+→ regression coverage
 → rerun verification
 ```
 
 ---
 
-## 9. Review Truthfulness
+## 8. Independent Review Evidence Gate
 
-If a separate native Reviewer subagent actually reviews the work, that is independent review.
+A review may be called independent only when a separate native Reviewer execution context actually performed it.
 
-If no separate Reviewer can be delegated and the Manager checks its own work, report:
+Valid evidence is a real native Reviewer delegation/result and, when Runtime lifecycle tools are active, the matching Reviewer lifecycle record.
+
+These are not evidence of independence:
+
+```text
+loading Review Skill
+reading reviewer.md
+Manager checking its own work
+logical Reviewer dashboard role without a real subagent
+```
+
+If no separate Reviewer subagent ran, say:
 
 ```text
 Review mode: self-review fallback
 ```
 
-Never call self-review independent review.
-
-If a Reviewer subagent did run, do not later claim self-review fallback for the whole review phase.
+Never say "independent review" or equivalent without separate-context evidence.
 
 ---
 
-## 10. Final Delivery
+## 9. Review Findings Drive Remediation
+
+After Reviewer findings:
+
+1. record the real review result/evidence;
+2. classify severity and blocking status;
+3. continue when blocking findings exist.
+
+Default policy:
+
+```text
+Critical → blocking
+High     → blocking
+Medium   → blocking when correctness, security, data integrity, persistence, or required behavior is affected
+Low      → normally non-blocking unless acceptance is prevented
+```
+
+When blocking findings exist, append follow-up tasks such as:
+
+```text
+Fix review findings
+→ Regression verification
+→ Re-review
+```
+
+Do not finish merely because the original review task is done.
+
+---
+
+## 10. Completion Gate
+
+Final completion requires:
+
+```text
+all current Runtime tasks done
+AND
+active native subagents = 0
+AND
+required verification complete
+AND
+blocking review findings resolved
+```
+
+At true completion:
+
+```text
+phase = completed
+working members = 0
+all non-failed members = done
+currentTask = null
+```
+
+If remediation tasks are added later, reopening the workflow is expected.
+
+---
+
+## 11. Final Delivery
 
 Before finishing, confirm Runtime state matches reality.
 
@@ -350,9 +351,10 @@ what was completed
 execution mode
 native subagents actually used
 verification performed
-review result
-blocking findings and how they were resolved
+review type/result
+blocking findings and remediation
 remaining issues
+Runtime/Dashboard final state
 ```
 
 Do not expose raw subagent transcripts unless requested.
