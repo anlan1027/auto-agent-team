@@ -1,8 +1,10 @@
 # Auto Agent Team Plugin
 
+Current stable version: **v0.3.0**.
+
 This directory contains the optional Codex Plugin layer for Auto Agent Team.
 
-The standalone root `SKILL.md` remains the top-level orchestration Skill. This plugin provides a local MCP runtime plus a DSH-style dashboard; it does not install a duplicate Skill.
+The root `SKILL.md` remains the top-level orchestration Skill. The plugin provides a local MCP Runtime and DSH-style Dashboard; it does not install a duplicate Skill.
 
 ## Architecture
 
@@ -13,19 +15,17 @@ Auto Agent Team Skill / Manager
   ↓
 Native Codex subagents by default for suitable independent work
   ↓
-Agent Team MCP runtime
+Agent Team MCP Runtime
   ├─ .agent-team/team.json
-  ├─ dependency/state scheduler
-  └─ native subagent lifecycle ledger
+  ├─ task/dependency state
+  └─ native-subagent lifecycle ledger
   ↓
 MCP Apps dashboard
 ```
 
-The host decides where the dashboard is rendered. The plugin cannot force a permanent Codex right-side panel.
+The Codex Host decides where the Dashboard is rendered. The plugin cannot force a permanent native right-side panel.
 
 ## Execution modes
-
-There are three runtime execution modes:
 
 ```text
 UNKNOWN
@@ -33,20 +33,21 @@ NATIVE_SUBAGENTS
 SEQUENTIAL_ROLE_FALLBACK
 ```
 
-`UNKNOWN` is the startup state until real native delegation is proven.
+- `UNKNOWN`: startup state until execution capability is proven.
+- `NATIVE_SUBAGENTS`: default successful path after at least one real native Codex subagent is recorded.
+- `SEQUENTIAL_ROLE_FALLBACK`: emergency single-Agent backup only after concrete native-spawn unavailability, disablement, lack of support, or an actual spawn failure.
 
-`NATIVE_SUBAGENTS` is the default successful execution path for suitable independent work. A successful native Codex subagent switches the runtime to this mode.
-
-`SEQUENTIAL_ROLE_FALLBACK` is emergency single-Agent backup only. It should be used only after concrete evidence that native spawning is unavailable, unsupported, disabled, or an actual native spawn attempt failed. It is not the normal/default mode and must not be selected merely because the native spawn capability is not immediately visible.
-
-Dashboard labels reflect this policy:
+Dashboard labels:
 
 ```text
 原生多 Agent（默认）
 保底模式（单 Agent）
+等待原生 Agent 确认
 ```
 
 ## Runtime tools
+
+The v0.3.0 Runtime exposes 10 tools:
 
 - `agent_team_create`
 - `agent_team_get`
@@ -59,35 +60,44 @@ Dashboard labels reflect this policy:
 - `agent_team_append_event`
 - `agent_team_render_dashboard`
 
-The runtime is local and has no npm dependencies beyond Node.js itself.
+The Runtime is local and has no npm dependencies beyond Node.js itself.
 
 ## Native Codex subagent tracking
 
-A real Codex subagent is tracked separately from the logical team role. For example:
+A real Codex subagent is tracked separately from the logical team member:
 
 ```text
-Codex display name: Wegener
-Logical role:       Reviewer
-Runtime member:     reviewer
-Runtime task:       t4
+Codex display name: Heisenberg
+Logical role:       Architect
+Runtime member:     architect
+Runtime task:       T1
 ```
 
-When a native delegation succeeds, the Manager records it with `agent_team_subagent_started`. When it returns, fails, or is cancelled, the Manager records the terminal result with `agent_team_subagent_finished`.
+After real native delegation succeeds, record it with `agent_team_subagent_started`. When the native agent completes, fails, or is cancelled, record the terminal result with `agent_team_subagent_finished`.
 
-Ordinary chats, top-level tasks, `create_thread`, `fork_thread`, `handoff_thread`, or cross-task delegation do not count as native subagents.
+Ordinary chats, top-level Tasks, `create_thread`, `fork_thread`, `handoff_thread`, or cross-task delegation do not count as native subagents.
 
-Active native subagents are a completion gate. The runtime does not allow a linked task to be marked done while its native subagent is still running, and `phase=completed` requires both:
+Active native subagents are part of completion gating. A linked task cannot be marked done while its native subagent is still running.
+
+## Main tasks and dynamic follow-up tasks
+
+Tasks present when `agent_team_create` creates the team are treated by the Dashboard as **main tasks**.
+
+Tasks later appended through `agent_team_add_task` are displayed separately as **dynamic follow-up tasks**. Typical examples include:
 
 ```text
-all current tasks are done
-active native subagents = 0
+bug fix
+review remediation
+regression verification
+re-review
+newly discovered follow-up work
 ```
 
-The dashboard shows native subagent display name, logical role, task, status, result, and evidence when recorded.
+This keeps the top-level main-task denominator stable instead of showing progress such as `8/9 → 9/11 → 12/14` as follow-up work is discovered.
 
 ## Review remediation loop
 
-Review is not automatically equivalent to project completion. Blocking findings should append follow-up work such as:
+Blocking review findings should append follow-up work rather than rewriting completed history:
 
 ```text
 Fix review findings
@@ -95,7 +105,7 @@ Fix review findings
 → Re-review
 ```
 
-The scheduler can reopen a previously completed team when new remediation tasks are added.
+Adding follow-up work can reopen a previously completed team.
 
 ## Runtime verification
 
@@ -105,7 +115,24 @@ Run:
 node ./scripts/smoke-test.mjs
 ```
 
-The smoke test verifies fresh-workspace behavior, native-subagent lifecycle tracking, execution-mode switching, linked-task completion gating, dependency scheduling, final member convergence, dashboard native-agent data, and remediation reopening.
+The smoke test verifies:
+
+- fresh workspace behavior;
+- the 10-tool Runtime surface;
+- native-subagent lifecycle tracking;
+- execution-mode switching;
+- linked-task completion gating;
+- dependency scheduling;
+- final member convergence;
+- remediation reopening;
+- Dashboard native-agent state;
+- Dashboard main-task / dynamic-task separation.
+
+Expected output:
+
+```text
+Auto Agent Team runtime smoke test passed.
+```
 
 ## State
 
