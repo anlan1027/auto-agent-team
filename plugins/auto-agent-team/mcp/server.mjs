@@ -4,7 +4,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "Auto Agent Team Runtime";
-const SERVER_VERSION = "0.3.0-dev.3";
+const SERVER_VERSION = "0.3.0";
 const TEMPLATE_URI = "ui://auto-agent-team/team-dashboard.html";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = path.resolve(__dirname, "..");
@@ -494,7 +494,7 @@ function handle(id, method, params) {
   if (method === "resources/list") return result(id, { resources: [{ uri: TEMPLATE_URI, name: "Agent Team Dashboard", mimeType: "text/html;profile=mcp-app" }] });
   if (method === "resources/read") {
     if (params?.uri !== TEMPLATE_URI) return error(id, JsonRpcError.INVALID_PARAMS, `Unknown resource: ${params?.uri ?? ""}`);
-    try { const html = fs.readFileSync(UI_PATH, "utf8"); result(id, { contents: [{ uri: TEMPLATE_URI, mimeType: "text/html;profile=mcp-app", text: html, _meta: { ui: { prefersBorder: true } } }] }); }
+    try { const html = fs.readFileSync(UI_PATH, "utf8"); result(id, { contents: [{ uri: TEMPLATE_URI, mimeType: "text/html;profile=mcp-app", text: html, _meta: { ui: { prefersBorder: true } } }] });
     catch (e) { error(id, JsonRpcError.INTERNAL, e instanceof Error ? e.message : String(e)); }
     return;
   }
