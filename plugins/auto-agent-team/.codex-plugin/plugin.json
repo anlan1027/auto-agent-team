@@ -1,6 +1,6 @@
 {
   "name": "auto-agent-team",
-  "version": "0.3.0-dev.3.2",
+  "version": "0.3.0",
   "description": "Coordinate native Codex subagents by default and show DSH-style team state, fixed main tasks, dynamic follow-up work, verification, review, and backup execution in a live dashboard.",
   "author": {
     "name": "anlan1027",
