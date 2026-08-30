@@ -1,6 +1,6 @@
 {
   "name": "auto-agent-team",
-  "version": "0.3.0-dev.2",
+  "version": "0.3.0-dev.3",
   "description": "Coordinate native Codex subagents and show DSH-style team state, tasks, dependencies, verification, and review in a live dashboard.",
   "author": {
     "name": "anlan1027",
@@ -22,7 +22,7 @@
   "interface": {
     "displayName": "Auto Agent Team",
     "shortDescription": "Native Codex subagent orchestration with a live team dashboard",
-    "longDescription": "Adds a local Agent Team MCP runtime and DSH-style dashboard for members, tasks, dependencies, progress, verification, review, remediation, and re-review. It is designed to work alongside the standalone Auto Agent Team Skill rather than installing a duplicate Skill.",
+    "longDescription": "Adds a local Agent Team MCP runtime and DSH-style dashboard for members, native Codex subagents, tasks, dependencies, progress, verification, and review. It is designed to work alongside the standalone Auto Agent Team Skill rather than installing a duplicate Skill.",
     "developerName": "anlan1027",
     "category": "Developer Tools",
     "capabilities": [
