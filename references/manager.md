@@ -19,13 +19,14 @@ The Manager must:
 3. build a compact dependency-aware task graph;
 4. select the smallest effective team;
 5. use native Codex subagents for genuinely independent work when the host supports them;
-6. keep Runtime state truthful and current;
-7. integrate results centrally;
-8. run real verification;
-9. recover from failures;
-10. perform independent review when a real Reviewer subagent can be delegated;
-11. continue remediation when review finds blocking issues;
-12. finish only when the project and Runtime state both reflect the real outcome.
+6. record every real native subagent start/finish in Runtime when those lifecycle tools are available;
+7. keep Runtime task/member/native-agent state truthful and current;
+8. integrate results centrally;
+9. run real verification;
+10. recover from failures;
+11. perform independent review when a real Reviewer subagent can be delegated;
+12. continue remediation when review finds blocking issues;
+13. finish only when the project and Runtime state both reflect the real outcome.
 
 ---
 
@@ -82,12 +83,19 @@ Use while the Manager has not yet proven whether native delegation is available.
 
 ### NATIVE_SUBAGENTS
 
-As soon as any real native Codex subagent is successfully delegated, immediately call:
+As soon as any real native Codex subagent is successfully delegated, record that lifecycle event with:
 
 ```text
-agent_team_set_execution_mode
-executionMode = NATIVE_SUBAGENTS
+agent_team_subagent_started
 ```
+
+The Runtime will switch execution mode to:
+
+```text
+NATIVE_SUBAGENTS
+```
+
+automatically. If the lifecycle tool is unavailable but `agent_team_set_execution_mode` is available, set it explicitly.
 
 Do this even if only one role, such as Reviewer, was delegated natively.
 
@@ -101,7 +109,7 @@ Do not use fallback simply because the first phase happened in the Manager conte
 
 ---
 
-## 3. Native Subagents
+## 3. Native Subagent Lifecycle Synchronization
 
 Valid native delegation examples:
 
@@ -126,7 +134,37 @@ self-review
 manually creating unrelated top-level chats to imitate agents
 ```
 
-Whenever a native subagent starts or completes, synchronize its member/task state in Runtime.
+When Runtime exposes native lifecycle tools, use them around every real native delegation:
+
+```text
+native delegation succeeds
+↓
+agent_team_subagent_started
+  name = Codex display name when known (for example Wegener)
+  role = Reviewer / Tester / Developer / ...
+  memberId = logical Runtime member when mapped
+  taskId = Runtime task when mapped
+↓
+subagent works
+↓
+subagent returns / fails / is cancelled
+↓
+agent_team_subagent_finished
+  status = done / failed / cancelled
+  result = concise outcome
+  evidence = concise references when useful
+```
+
+Do not wait until the very end of the whole project to record these transitions.
+
+Do not mark a linked Runtime task `done` while its native subagent is still running. `agent_team_subagent_finished` should normally close the linked task itself.
+
+The Codex display name and logical role are different concepts. Preserve both when known:
+
+```text
+name: Wegener
+role: Reviewer
+```
 
 ---
 
@@ -176,7 +214,7 @@ Independent review is a quality gate, not a ceremonial final task.
 
 After Reviewer returns findings:
 
-1. record the review task result and concise evidence;
+1. finish the Reviewer native lifecycle record with its real result/evidence;
 2. classify findings by severity and whether they are blocking;
 3. continue the workflow when blocking findings exist.
 
@@ -205,12 +243,23 @@ A project reaches final completion only after blocking review findings have been
 
 ---
 
-## 6. Completion Convergence
+## 6. Completion Gate and Convergence
 
-When all current Runtime tasks are `done`:
+Final completion requires both conditions:
+
+```text
+all current Runtime tasks are done
+AND
+active native subagents = 0
+```
+
+If a native subagent is still running, the team must remain active even if every logical task was accidentally marked done.
+
+When both conditions are satisfied:
 
 ```text
 phase = completed
+active native subagents = 0
 working members = 0
 all non-failed members = done
 currentTask = null
