@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Auto Agent Team</title>
+<style>
+:root{color-scheme:light dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:transparent;color:CanvasText}
+.panel{max-width:760px;margin:0 auto;padding:14px}
+.card{border:1px solid color-mix(in srgb,CanvasText 16%,transparent);border-radius:16px;background:color-mix(in srgb,Canvas 94%,CanvasText 6%);overflow:hidden}
+.header{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:16px;border-bottom:1px solid color-mix(in srgb,CanvasText 12%,transparent)}
+.title{font-weight:700;font-size:17px}.sub{font-size:12px;opacity:.68;margin-top:3px}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid color-mix(in srgb,CanvasText 15%,transparent);border-radius:999px;padding:5px 9px;font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:#94a3b8}.dot.running{background:#22c55e}.dot.blocked,.dot.failed{background:#ef4444}.dot.completed{background:#3b82f6}
+.section{padding:14px 16px;border-bottom:1px solid color-mix(in srgb,CanvasText 10%,transparent)}.section:last-child{border-bottom:0}
+.section-title{font-size:13px;font-weight:650;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px}
+.metric{padding:10px;border-radius:11px;background:color-mix(in srgb,CanvasText 6%,transparent)}.metric b{display:block;font-size:18px}.metric span{font-size:11px;opacity:.65}
+.row{display:grid;grid-template-columns:minmax(100px,1fr) minmax(90px,.8fr) auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid color-mix(in srgb,CanvasText 8%,transparent)}.row:first-of-type{border-top:0}
+.name{font-weight:600;font-size:13px}.meta{font-size:11px;opacity:.62;margin-top:2px}
+.status{font-size:11px;border-radius:999px;padding:4px 8px;background:color-mix(in srgb,CanvasText 7%,transparent)}
+.task{padding:10px 0;border-top:1px solid color-mix(in srgb,CanvasText 8%,transparent)}.task:first-of-type{border-top:0}
+.task-head{display:flex;justify-content:space-between;gap:8px}.task-id{font:600 11px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65}.task-subject{font-size:13px;font-weight:600;flex:1}.task-detail{font-size:11px;opacity:.65;margin-top:5px}
+.dep{display:inline-block;margin:3px 4px 0 0;padding:2px 6px;border-radius:7px;background:color-mix(in srgb,CanvasText 7%,transparent)}
+.event{font-size:11px;padding:6px 0;border-top:1px solid color-mix(in srgb,CanvasText 7%,transparent)}.event:first-of-type{border-top:0}
+.toolbar{display:flex;gap:8px}.btn{border:1px solid color-mix(in srgb,CanvasText 18%,transparent);background:transparent;color:inherit;border-radius:9px;padding:6px 9px;cursor:pointer;font-size:12px}.btn:hover{background:color-mix(in srgb,CanvasText 7%,transparent)}
+.empty{font-size:12px;opacity:.65;padding:8px 0}
+</style>
+</head>
+<body>
+<div class="panel"><div class="card" id="app"><div class="section">正在等待 Agent Team 状态…</div></div></div>
+<script>
+const app=document.getElementById("app");
+const pending=new Map(); let nextId=1; let workspacePath=null;
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+function request(method,params){const id=nextId++;window.parent.postMessage({jsonrpc:"2.0",id,method,params},"*");return new Promise((resolve,reject)=>pending.set(id,{resolve,reject}));}
+function statusClass(s){return ["running","completed","blocked","failed"].includes(s)?s:"";}
+function render(data){
+ const team=data?.team??data;if(!team){app.innerHTML='<div class="section empty">尚未创建团队状态。</div>';return;}
+ workspacePath=data?.workspacePath??team.workspacePath??workspacePath;
+ const members=Array.isArray(team.members)?team.members:[];const tasks=Array.isArray(team.tasks)?team.tasks:[];const events=Array.isArray(team.events)?team.events:[];
+ const done=tasks.filter(t=>t.status==="done").length;const working=members.filter(m=>m.status==="working").length;
+ app.innerHTML=`
+ <div class="header"><div><div class="title">${esc(team.name||"Auto Agent Team")}</div><div class="sub">${esc(team.description||"")}</div></div>
+ <div class="toolbar"><span class="pill"><span class="dot ${statusClass(team.phase)}"></span>${esc(team.phase||"planning")}</span><button class="btn" id="refresh">刷新</button></div></div>
+ <div class="section"><div class="grid">
+ <div class="metric"><b>${members.length}</b><span>成员</span></div><div class="metric"><b>${working}</b><span>执行中</span></div>
+ <div class="metric"><b>${done}/${tasks.length}</b><span>任务完成</span></div><div class="metric"><b>${esc(team.executionMode||"UNKNOWN")}</b><span>执行模式</span></div></div></div>
+ <div class="section"><h3 class="section-title">成员与状态</h3>${members.length?members.map(m=>`
+ <div class="row"><div><div class="name">${esc(m.name||m.id)}</div><div class="meta">${esc(m.role||"")} ${m.agentProfile?`· ${esc(m.agentProfile)}`:""}</div></div>
+ <div><div class="meta">${m.currentTask?`任务 ${esc(m.currentTask)}`:"暂无任务"}</div><div class="meta">${esc(m.summary||"")}</div></div><span class="status">${esc(m.status||"idle")}</span></div>`).join(""):'<div class="empty">暂无成员</div>'}</div>
+ <div class="section"><h3 class="section-title">任务与依赖</h3>${tasks.length?tasks.map(t=>`
+ <div class="task"><div class="task-head"><span class="task-id">${esc(t.id)}</span><span class="task-subject">${esc(t.subject||t.objective)}</span><span class="status">${esc(t.status||"pending")}</span></div>
+ <div class="task-detail">负责人：${esc(t.assignee||"未分配")} · 类型：${esc(t.kind||"task")}</div>
+ ${t.dependencies?.length?`<div class="task-detail">依赖：${t.dependencies.map(d=>`<span class="dep">${esc(d)}</span>`).join("")}</div>`:""}
+ ${t.result?`<div class="task-detail">结果：${esc(t.result)}</div>`:""}</div>`).join(""):'<div class="empty">暂无任务</div>'}</div>
+ <div class="section"><h3 class="section-title">最近活动</h3>${events.length?events.slice(-8).reverse().map(e=>`<div class="event">${esc(e.at||"")} · ${esc(e.message||e.kind||"")}</div>`).join(""):'<div class="empty">暂无事件</div>'}</div>`;
+ document.getElementById("refresh")?.addEventListener("click",refresh);
+}
+async function refresh(){if(!workspacePath)return;try{const res=await request("tools/call",{name:"agent_team_get",arguments:{workspacePath}});if(res?.structuredContent)render(res.structuredContent);}catch(e){console.error(e);}}
+window.addEventListener("message",(event)=>{if(event.source!==window.parent)return;const msg=event.data;if(!msg||msg.jsonrpc!=="2.0")return;
+ if(msg.id!==undefined&&pending.has(msg.id)){const p=pending.get(msg.id);pending.delete(msg.id);msg.error?p.reject(msg.error):p.resolve(msg.result);return;}
+ if(msg.method==="ui/notifications/tool-input")workspacePath=msg.params?.workspacePath??workspacePath;
+ if(msg.method==="ui/notifications/tool-result"){const out=msg.params?.structuredContent;if(out)render(out);}
+},{passive:true});
+if(window.openai?.toolOutput)render(window.openai.toolOutput);
+setInterval(()=>{if(workspacePath)refresh();},5000);
+</script>
+</body>
+</html>
