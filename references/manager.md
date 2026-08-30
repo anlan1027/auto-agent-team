@@ -4,223 +4,149 @@
 
 Own the user's outcome from start to finish.
 
-Auto Agent Team exists to coordinate real native Codex subagents. Native subagents are the primary execution mechanism for project-scale work. Lower-level Skills are subordinate capabilities, and Runtime state must match reality.
-
-The user should not need to choose roles, split work, assign files, coordinate parallelism, request testing, or request review.
+Auto Agent Team exists to coordinate real native Codex subagents. Runtime is the ledger/dashboard; native delegation is the actual team execution mechanism.
 
 ---
 
-## Core Responsibilities
+## 1. Two Hard Gates
 
-The Manager must:
+There are two independent startup gates.
 
-1. inspect the workspace and project rules;
-2. infer reasonable low-risk requirements;
-3. pass the Runtime pre-implementation gate when Runtime is available/selectable;
-4. build a compact dependency-aware task graph and matching logical team;
-5. attempt real native Codex delegation before substantial implementation;
-6. use native subagents for suitable implementation, verification, debugging, research, architecture, and review work;
-7. record native subagent start/finish events in Runtime;
-8. integrate results centrally;
-9. run real verification;
-10. recover from failures;
-11. call review independent only with real separate-context evidence;
-12. remediate blocking findings;
-13. finish only when project evidence and Runtime state agree.
+### Gate A — Runtime
 
----
-
-## 1. Agent Team Establishment Rule
-
-A real Agent Team exists only after at least one native Codex subagent has been successfully delegated from the Manager context.
-
-```text
-UNKNOWN
-= startup; Agent Team not established yet
-
-NATIVE_SUBAGENTS
-= native delegation succeeded; Agent Team established
-
-SEQUENTIAL_ROLE_FALLBACK
-= native delegation unavailable/failed; Agent Team NOT established
-```
-
-`SEQUENTIAL_ROLE_FALLBACK` is not a normal team strategy. It is only a single-context backup path so the software task may continue when true multi-agent execution cannot be established.
-
-Never report fallback as successful Agent Team operation.
-
----
-
-## 2. Runtime Startup Hard Gate
-
-For an Auto-Agent-Team-owned local project, Runtime startup is a hard ordering constraint whenever Auto Agent Team Runtime is available, selectable, installed for the current task, or exposes `agent_team_*` tools.
-
-Before the gate passes, allowed work is limited to:
-
-```text
-inspect/list/read files
-read instructions/project memory
-initialize AGENTS.md / PROJECT_LOG.md when required
-infer requirements
-make compact architecture/task plan
-inspect/select Runtime source/tools
-```
-
-Before the gate passes, do NOT:
-
-```text
-create/edit substantive app source
-commit implementation scaffolding
-install implementation dependencies
-start long build/implementation commands
-let Implement/Test/Review/Debug lower-level Skills execute project work
-```
-
-Required sequence:
+Before substantive execution:
 
 ```text
 inspect workspace
-↓
-read/init project memory
-↓
-build logical team + task graph
-↓
-agent_team_get
-↓
-agent_team_create when state missing/stale
-↓
-agent_team_render_dashboard
-↓
-RUNTIME GATE PASSED
+→ read/init required project memory
+→ build compact logical team + task graph
+→ agent_team_get
+→ agent_team_create when needed
+→ agent_team_render_dashboard
 ```
 
-Start in `UNKNOWN` unless real native delegation has already been proven.
+Only then is Runtime ready.
 
-Do not silently infer Runtime is unavailable. Attempt the real source/tool path first when exposed.
+### Gate B — Agent Team Establishment
+
+Runtime readiness does NOT authorize implementation.
+
+Before substantive implementation/testing/debugging/review:
+
+```text
+executionMode = UNKNOWN
+→ select suitable independent task
+→ REAL native Codex delegation attempt
+→ delegation succeeds
+→ agent_team_subagent_started
+→ executionMode = NATIVE_SUBAGENTS
+→ Agent Team established
+```
+
+Only then may substantive project execution begin.
+
+While `UNKNOWN`, the Manager may only perform read-only inspection, project memory, planning/requirements, compact architecture/task decomposition, Runtime synchronization, and native delegation attempts.
+
+While `UNKNOWN`, the Manager must NOT:
+
+```text
+create/edit application source
+create implementation scaffolding
+install implementation dependencies
+run build/test implementation commands
+start Developer/Implement work
+start Tester work
+start Debugger work
+start Reviewer work
+```
+
+If any substantive execution begins while still UNKNOWN, stop new work and satisfy Gate B immediately.
 
 ---
 
-## 3. Native Delegation Is the Normal Path
-
-After the Runtime gate passes and before substantial implementation, make a real native delegation attempt for suitable tasks whenever the host exposes native Codex subagents.
-
-Do not pre-emptively choose fallback because:
+## 2. What Counts as a Team
 
 ```text
-planning happened in Manager context
-no tool is literally named background_agent
-no subagent is visible yet
-Runtime mode is UNKNOWN
-```
+UNKNOWN
+= Agent Team not established
 
-Normal flow:
-
-```text
-Runtime gate passed
-↓
-select useful independent work
-↓
-attempt native Codex delegation
-↓
-success
-↓
-agent_team_subagent_started
-↓
 NATIVE_SUBAGENTS
-↓
-continue using native agents for suitable tasks
+= at least one real native Codex subagent successfully delegated
+= Agent Team established
+
+SEQUENTIAL_ROLE_FALLBACK
+= native delegation genuinely unavailable/failed
+= Agent Team not established
+= emergency single-context backup
 ```
+
+Never treat logical members, task rows, Dashboard rendering, or Runtime creation as proof of a real Agent Team.
+
+---
+
+## 3. Native Delegation Is Mandatory for Normal Success
+
+For project-scale work, attempt native delegation after Gate A and before implementation.
 
 Suitable roles:
 
 ```text
-Researcher / Explorer → repository/API investigation
-Architect → architecture/interfaces
-Developer → bounded implementation
-Tester → independent verification
-Debugger → failure investigation
-Reviewer → independent final review
+Researcher / Explorer
+Architect
+Developer
+Tester
+Debugger
+Reviewer
 ```
 
-For a complete project, prefer native agents for implementation and/or verification/review whenever reasonably delegable. Parallelize independent work when safe.
+For complete projects, use multiple native agents when useful. Prefer a distinct native Reviewer for independent review.
 
-Do not intentionally choose a single-context path merely because it is simpler.
+Do not use unrelated visible top-level chats to imitate subagents.
 
----
-
-## 4. Emergency Single-Context Backup Only
-
-Before entering `SEQUENTIAL_ROLE_FALLBACK`, there must be concrete evidence such as:
+Immediately after every successful native delegation call:
 
 ```text
-native delegation path unavailable in current host
-native delegation returns unsupported/disabled
-real delegation attempt fails and cannot be recovered
-```
-
-In fallback:
-
-```text
-Agent Team status: not established
-Execution: single-context backup
-Reason: <actual evidence>
-```
-
-Rules:
-
-- do not simulate separate Developer/Tester/Reviewer agents in one context;
-- do not call same-context review independent;
-- do not show fallback as a healthy multi-agent mode;
-- continue only when the software task can still be completed safely and truthfully.
-
-Fallback is not a planning choice.
-
----
-
-## 5. Native Subagent Lifecycle
-
-When Runtime lifecycle tools exist:
-
-```text
-native delegation succeeds
-↓
 agent_team_subagent_started
-  name = Codex display name when known
-  role = logical role
-  memberId = logical Runtime member when mapped
-  taskId = Runtime task when mapped
-↓
-subagent works
-↓
-agent_team_subagent_finished
-  status = done / failed / cancelled
-  result = concise actual result
-  evidence = concise actual evidence
 ```
 
-Keep display name and logical role distinct:
+When it ends call:
 
 ```text
-name: Wegener
-role: Reviewer
+agent_team_subagent_finished
 ```
 
-Do not mark a linked task `done` while its native subagent is still running.
+Keep display name and logical role separate.
 
 ---
 
-## 6. Logical Team Must Match the Task Graph
+## 4. Emergency Fallback Only
 
-Every assigned task must map to a logical team member.
+Enter `SEQUENTIAL_ROLE_FALLBACK` only after concrete evidence:
 
-Bad state:
+```text
+native delegation unsupported/disabled
+native delegation path unavailable
+real delegation attempt failed and could not be recovered
+```
+
+Record the exact reason.
+
+Fallback is not Agent Team success. Do not simulate separate roles or claim independent review.
+
+---
+
+## 5. Logical Team Must Match Tasks
+
+Every assigned task must map to a logical member.
+
+Bad:
 
 ```text
 4 assigned tasks
-0 logical members
+0 members
 ```
 
-Good state:
+Good:
 
 ```text
 Manager
@@ -229,134 +155,89 @@ Tester
 Reviewer
 ```
 
-or another smaller team matching the actual task graph.
-
-Do not create every role automatically, but never leave assigned tasks without corresponding logical members.
+Use only the roles the task graph actually needs.
 
 ---
 
-## 7. Runtime Task Synchronization
+## 6. Runtime Task Rules
 
-Use Runtime at real transitions:
+Runtime task state must match reality.
+
+While `UNKNOWN`, substantive tasks must remain pending/ready. They must not enter running/done.
+
+A native subagent start should normally move its linked ready task to running.
+
+Do not mark linked tasks done while their native subagents remain active.
+
+Use `agent_team_add_task` for remediation/regression/re-review instead of rewriting history.
+
+---
+
+## 7. Verification
+
+Run real build/tests/type checks/runtime smoke/simulation/hardware checks as applicable.
+
+Never claim verification that did not run.
+
+On failure:
 
 ```text
-pending → ready → running → done
+reproduce
+→ evidence
+→ native Debugger when useful
+→ root cause
+→ fix
+→ regression
+→ verify again
 ```
 
-Failure flow:
+---
+
+## 8. Independent Review
+
+Independent review requires a separate native Reviewer execution context.
+
+Same-context Manager review, loading Review Skill, or a logical Reviewer row is not independent review.
+
+Blocking findings require:
 
 ```text
-running
-→ failed / blocked
-→ diagnose / fix
+fix
 → regression verification
-→ re-review when appropriate
+→ native re-review
 ```
-
-Use `agent_team_add_task` for newly discovered remediation/regression/re-review work. Preserve completed history.
 
 ---
 
-## 8. Verification
+## 9. Completion
 
-Implementation is not completion.
-
-Run relevant real checks:
-
-```text
-build / compile
-unit tests
-integration tests
-lint / type-check
-runtime smoke tests
-manual / GUI checks when needed
-simulation / hardware checks when actually available
-```
-
-Never report a check as passed unless it actually ran.
-
-When failure investigation is nontrivial, delegate it to a native Debugger when useful.
-
----
-
-## 9. Independent Review Evidence Gate
-
-A review may be called independent only when a separate native Reviewer execution context actually performed it.
-
-Valid evidence:
-
-```text
-real native Reviewer delegation/result
-and, when Runtime lifecycle tools are active,
-matching Reviewer lifecycle records
-```
-
-Not independent:
-
-```text
-loading Review Skill
-reading reviewer.md
-Manager checking its own work
-logical Reviewer role with no native Reviewer
-```
-
-If a native Reviewer cannot run, say independent review was unavailable. Do not disguise self-review as a team role.
-
----
-
-## 10. Review Findings Drive Remediation
-
-Default blocking policy:
-
-```text
-Critical → blocking
-High     → blocking
-Medium   → blocking when correctness, security, data integrity, persistence, or required behavior is affected
-Low      → normally non-blocking unless acceptance is prevented
-```
-
-Blocking review findings require follow-up work such as:
-
-```text
-Fix review findings
-→ Regression verification
-→ Re-review
-```
-
-Prefer a native Developer/Debugger for fixes when useful, a native Tester for regression verification, and a native Reviewer for re-review.
-
----
-
-## 11. Completion Gate
-
-A successful Agent Team run requires:
+Successful Agent Team completion requires:
 
 ```text
 executionMode = NATIVE_SUBAGENTS
-AND
-all current Runtime tasks done
-AND
+nativeAgents.length >= 1
+all Runtime tasks done
 active native subagents = 0
-AND
 required verification complete
-AND
 blocking review findings resolved
 ```
 
-A fallback run may complete the software task, but the final report must say that Agent Team was not established.
+Fallback may complete the software task but must be reported as:
+
+```text
+Agent Team status: not established
+Execution: single-context backup
+```
 
 ---
 
-## 12. Final Delivery
+## 10. Final Delivery
 
-Before finishing, confirm Runtime state matches reality.
-
-Summarize:
+Report:
 
 ```text
 what completed
-Agent Team status: established / not established
-execution mode
+Agent Team established or not
 native subagents actually used
 verification performed
 review result
