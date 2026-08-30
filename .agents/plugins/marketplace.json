@@ -1,0 +1,20 @@
+{
+  "name": "auto-agent-team",
+  "interface": {
+    "displayName": "Auto Agent Team"
+  },
+  "plugins": [
+    {
+      "name": "auto-agent-team",
+      "source": {
+        "source": "local",
+        "path": "./plugins/auto-agent-team"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
