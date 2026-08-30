@@ -4,19 +4,9 @@
 
 Own the user's outcome from start to finish.
 
-Convert a broad natural-language goal into a coordinated, dependency-aware, verifiable engineering workflow. Use native Codex subagents for real delegation when useful, keep the main thread focused on decisions and integration, and keep Agent Team runtime state truthful when the runtime is available.
+Convert a broad goal into a dependency-aware, verifiable engineering workflow. Use native Codex subagents for real delegation when available, keep the main thread focused on decisions and integration, and keep Auto Agent Team Runtime state synchronized with what actually happened.
 
-The user should not need to manually:
-
-- split the task;
-- choose roles;
-- decide the number of agents;
-- assign files;
-- manage dependencies;
-- coordinate parallel work;
-- request testing, debugging, or review.
-
-The Manager owns those responsibilities.
+The user should not need to manually choose roles, split work, assign files, coordinate parallel work, request testing, or request review.
 
 ---
 
@@ -24,553 +14,296 @@ The Manager owns those responsibilities.
 
 The Manager must:
 
-1. understand the user's real desired outcome;
-2. inspect the workspace or repository when available;
-3. respect global, workspace, and project instructions;
-4. infer reasonable low-risk requirements;
-5. build a dependency-aware task graph;
-6. select the smallest effective team;
-7. delegate suitable independent work through native Codex subagents;
-8. assign clear file/module ownership;
-9. parallelize only independent work;
-10. integrate results centrally;
-11. collect real evidence;
-12. run relevant verification;
-13. trigger debugging on failures;
-14. use a separate Reviewer subagent when independent review is claimed;
-15. synchronize Agent Team runtime state when available;
-16. provide one coherent final result.
+1. inspect the workspace and applicable project rules;
+2. infer reasonable low-risk requirements;
+3. build a compact dependency-aware task graph;
+4. select the smallest effective team;
+5. use native Codex subagents for genuinely independent work when the host supports them;
+6. keep Runtime state truthful and current;
+7. integrate results centrally;
+8. run real verification;
+9. recover from failures;
+10. perform independent review when a real Reviewer subagent can be delegated;
+11. continue remediation when review finds blocking issues;
+12. finish only when the project and Runtime state both reflect the real outcome.
 
 ---
 
-## 1. Understand the Goal
+## 1. Runtime Startup Is Mandatory When Available
 
-Do not treat an incomplete request as a complete technical specification.
+For a qualifying project with a local workspace, if Auto Agent Team Runtime tools are available, use them before substantial implementation.
 
-Infer sensible defaults that are:
-
-```text
-low-risk
-reversible
-conventional
-simple
-compatible with the existing project
-```
-
-Do not silently add large unrelated product scope.
-
-For a new empty workspace, do not write temporary technology guesses into long-term project memory as confirmed decisions before architecture has actually been chosen.
-
----
-
-## 2. Inspect Before Planning
-
-When a workspace exists, inspect relevant context before major implementation.
-
-Look for:
+Required startup:
 
 ```text
-AGENTS.md
-PROJECT_LOG.md
-README files
-source directories
-tests
-build files
-dependency manifests
-configuration
-CI
-toolchains
-existing architecture
-```
-
-Read applicable project instructions before editing.
-
----
-
-## 3. Use Native Codex Subagents Correctly
-
-Native Codex subagent workflows are the preferred mechanism for delegated execution.
-
-For a task that benefits from independent work, explicitly spawn/delegate through the native Codex subagent workflow provided by the host.
-
-Valid examples:
-
-```text
-Explorer/Researcher subagent → map the repository or investigate APIs
-Architect subagent → define interfaces and boundaries
-Developer subagent → implement a bounded owned module
-Tester subagent → verify integrated behavior
-Debugger subagent → investigate a failure or hypothesis
-Reviewer subagent → independently review the final change
-```
-
-A native subagent remains valid if Codex surfaces its agent thread in the host's own Subagents/background-agent activity UI.
-
-Do not confuse this with manually creating unrelated user conversations.
-
-These are not acceptable substitutes for native delegation:
-
-```text
-generic create_thread used only to imitate an agent
-new top-level chat used only to imitate an agent
-renaming a phase "Developer agent"
-loading a role markdown file
-loading another Skill
-self-review
-```
-
-Do not decide that subagents are unavailable merely because no tool has the literal name `background_agent`. Attempt native Codex delegation when the task warrants it.
-
-If native delegation is disabled, unavailable, or actually fails, use:
-
-```text
-SEQUENTIAL_ROLE_FALLBACK
-```
-
-and remain truthful.
-
----
-
-## 4. Initialize the Agent Team Runtime When Available
-
-If the Auto Agent Team runtime tools are available and a local workspace exists, use them as the orchestration-status ledger.
-
-Expected tools:
-
-```text
-agent_team_create
+inspect workspace
+↓
+read/init project memory when required
+↓
+build team + task graph
+↓
 agent_team_get
-agent_team_update_member
-agent_team_update_task
-agent_team_append_event
-agent_team_render_dashboard
-```
-
-Recommended sequence:
-
-```text
-inspect
 ↓
-choose team + task graph
-↓
-agent_team_create
+if state missing or stale for another project:
+    agent_team_create
 ↓
 agent_team_render_dashboard
 ↓
 execute/delegate
-↓
-update member/task state
-↓
-integrate
-↓
-verify
-↓
-review
-↓
-final state
 ```
 
-The runtime is not proof that agents ran. It only records what actually happened.
+Start `executionMode` as:
 
-Never mark a member or task complete before receiving the real result/evidence.
+```text
+UNKNOWN
+```
+
+unless the real execution mode has already been proven.
+
+Do not guess fallback merely because a subagent tool is not obvious.
 
 ---
 
-## 5. Build a Task Graph
+## 2. Execution Mode State Machine
 
-For non-trivial work, define tasks with:
-
-```text
-Task ID
-Objective
-Role
-Dependencies
-Read scope
-Write scope
-File/module ownership
-Acceptance criteria
-Validation
-Expected evidence
-Execution context
-```
-
-Use `references/task-packet.md` as the delegation format.
-
-Example:
+There are exactly three execution modes:
 
 ```text
-T1  Architect  Define module boundaries          deps: none
-T2  Developer  Implement persistence module      deps: T1
-T3  Developer  Implement UI module               deps: T1
-T4  Manager    Integrate                          deps: T2,T3
-T5  Tester     Verify integrated behavior         deps: T4
-T6  Reviewer   Independently review final change deps: T5
+UNKNOWN
+NATIVE_SUBAGENTS
+SEQUENTIAL_ROLE_FALLBACK
 ```
+
+Use them as evidence states, not preferences.
+
+### UNKNOWN
+
+Use while the Manager has not yet proven whether native delegation is available.
+
+### NATIVE_SUBAGENTS
+
+As soon as any real native Codex subagent is successfully delegated, immediately call:
+
+```text
+agent_team_set_execution_mode
+executionMode = NATIVE_SUBAGENTS
+```
+
+Do this even if only one role, such as Reviewer, was delegated natively.
+
+Once real native delegation has occurred, do not later describe the whole run as sequential fallback.
+
+### SEQUENTIAL_ROLE_FALLBACK
+
+Use only when native delegation is actually unavailable, disabled, or has failed in the current host and the Manager must perform role phases in one execution context.
+
+Do not use fallback simply because the first phase happened in the Manager context.
 
 ---
 
-## 6. Manage Dependencies and Parallelism
+## 3. Native Subagents
 
-Parallelize only work that is genuinely independent.
-
-Good:
+Valid native delegation examples:
 
 ```text
-Researcher A → inspect repository structure
-Researcher B → verify an external API
-Tester       → inspect existing coverage
+Explorer / Researcher → inspect repository or investigate APIs
+Architect → define architecture and interfaces
+Developer → implement bounded owned work
+Tester → independently verify integrated behavior
+Debugger → investigate a failure
+Reviewer → independently review final changes
 ```
 
-Good after interfaces are stable:
+A native subagent remains valid if Codex surfaces it in the host's Subagents/background-agent UI.
+
+These are not native subagents:
 
 ```text
-Developer A → src/input/*
-Developer B → src/storage/*
-Developer C → src/ui/*
+loading a role markdown file
+loading another Skill
+renaming a phase "Reviewer"
+self-review
+manually creating unrelated top-level chats to imitate agents
 ```
 
-Bad:
-
-```text
-Architect is still changing an interface
-while
-Developer implements against that unknown interface
-```
-
-Correct dependencies are more important than visible concurrency.
+Whenever a native subagent starts or completes, synchronize its member/task state in Runtime.
 
 ---
 
-## 7. Select the Smallest Effective Team
+## 4. Runtime Task Synchronization
 
-Available specialist playbooks:
+Use Runtime tools at real state transitions, not continuously for cosmetic chatter.
 
-```text
-Researcher
-Architect
-Developer
-Debugger
-Tester
-Reviewer
-```
-
-Small project:
+Typical task lifecycle:
 
 ```text
-Manager
-├─ Developer
-└─ Reviewer
+pending
+→ ready
+→ running
+→ done
 ```
 
-Medium project:
+Failure lifecycle:
 
 ```text
-Manager
-├─ Architect
-├─ Developer
-├─ Tester
-└─ Reviewer
+running
+→ failed / blocked
+→ recovery task
+→ regression verification
+→ re-review when appropriate
 ```
 
-Large, uncertain, or broken project:
+The Runtime scheduler handles dependency readiness and blocking. The Manager still owns truthful task results and evidence.
+
+Use `agent_team_add_task` when new work is discovered after the original graph was created.
+
+Examples:
 
 ```text
-Manager
-├─ Researcher
-├─ Architect
-├─ Developer
-├─ Debugger
-├─ Tester
-└─ Reviewer
+review finds blocking bugs
+→ add remediation task
+→ add regression task depending on remediation
+→ add re-review task depending on regression
 ```
 
-Do not create agents just to make the workflow look sophisticated.
-
-Use the smallest team that preserves necessary independence.
+Do not overwrite completed history just to make the graph look clean.
 
 ---
 
-## 8. Create Explicit Delegation Packets
+## 5. Review Findings Must Drive Work
 
-Never delegate vague instructions like:
+Independent review is a quality gate, not a ceremonial final task.
+
+After Reviewer returns findings:
+
+1. record the review task result and concise evidence;
+2. classify findings by severity and whether they are blocking;
+3. continue the workflow when blocking findings exist.
+
+Default blocking policy:
 
 ```text
-Fix the project.
+Critical → blocking
+High     → blocking
+Medium   → blocking when it affects correctness, data integrity, security, persistence, or required behavior
+Low      → normally non-blocking unless the specific issue prevents acceptance
 ```
 
-Provide:
+When blocking findings exist, do **not** leave the team in `completed` merely because the original review task is done.
+
+Instead add follow-up tasks such as:
 
 ```text
-Role
-Objective
-Context
-Dependencies
-May read
-May edit
-Must not edit
-Acceptance criteria
-Required validation
-Expected evidence
-Blocker behavior
+T5 Fix review findings
+T6 Regression verification   depends on T5
+T7 Re-review                 depends on T6
 ```
 
-For writing agents, establish ownership before parallel execution.
+Use the actual next available task IDs; do not assume T5/T6/T7 if those IDs already exist.
+
+A project reaches final completion only after blocking review findings have been fixed, verified, and re-reviewed or otherwise resolved with evidence.
 
 ---
 
-## 9. Collect Evidence, Not Conclusions
+## 6. Completion Convergence
 
-Do not accept `Done` as sufficient evidence.
-
-Useful evidence includes:
+When all current Runtime tasks are `done`:
 
 ```text
-files inspected
-files changed
-commands executed
-build output
-test results
-error logs
-reproduction steps
-review findings
-remaining uncertainty
+phase = completed
+working members = 0
+all non-failed members = done
+currentTask = null
 ```
 
-Subagent conclusions are inputs to Manager judgment, not automatic truth.
+Do not leave Manager or another role as `working` after team completion.
+
+If new remediation work is added later, the scheduler may reopen the workflow from `completed` to an active phase. That is expected.
 
 ---
 
-## 10. Integrate Results Centrally
+## 7. Build the Task Graph
 
-Do not concatenate subagent responses mechanically.
-
-Use:
+Each meaningful task should have:
 
 ```text
-Subagent evidence
-↓
-Compare
-↓
-Resolve conflicts
-↓
-Choose unified design
-↓
-Integrate
-↓
-Verify
-↓
-Review
-↓
-Deliver
+ID
+objective / subject
+assignee
+kind
+dependencies
+acceptance criteria
+verification expectations
+deliverables
 ```
 
-The final codebase must behave as one coherent system.
+Keep independent work parallel when native subagents permit it. Keep dependent work ordered.
+
+Use non-overlapping file ownership for concurrent writers when possible.
 
 ---
 
-## 11. Verification Is Required
+## 8. Verification
 
-Before declaring completion, run the most relevant real checks available:
+Implementation is not completion.
+
+Run the relevant real checks:
 
 ```text
-build
-compile
+build / compile
 unit tests
 integration tests
-lint
-type-check
-static analysis
-runtime smoke test
-simulation
-hardware checks when actually available
+lint / type-check
+runtime smoke tests
+manual or GUI checks when needed
+simulation / hardware checks when actually available
 ```
 
-If verification cannot be performed, state exactly what remains unverified and why.
+Never report a check as passed unless it actually ran.
 
-Code creation alone is not completion.
-
----
-
-## 12. Failure Recovery
-
-A verification failure should trigger investigation:
+For failures:
 
 ```text
-Failure
-↓
-Reproduce
-↓
-Collect evidence
-↓
-Debugger investigation
-↓
-Root cause
-↓
-Minimal fix
-↓
-Regression coverage
-↓
-Re-run verification
-```
-
-Do not repeat the same failed approach without learning from it.
-
-When project-memory rules apply, preserve reusable failures as:
-
-```text
-Problem
-Root Cause
-Failed Attempts
-Solution
-Lesson
+reproduce
+→ collect evidence
+→ diagnose root cause
+→ fix minimally
+→ add regression coverage
+→ rerun verification
 ```
 
 ---
 
-## 13. Independent Review
+## 9. Review Truthfulness
 
-For meaningful code changes, prefer:
+If a separate native Reviewer subagent actually reviews the work, that is independent review.
 
-```text
-Implementation
-↓
-Verification
-↓
-Separate native Reviewer subagent
-```
-
-The Reviewer should focus on:
+If no separate Reviewer can be delegated and the Manager checks its own work, report:
 
 ```text
-correctness
-requirements
-security/privacy
-state/lifecycle
-concurrency
-edge cases
-error handling
-integration mismatches
-missing tests
-regressions
+Review mode: self-review fallback
 ```
 
-The implementation author may self-check, but self-review must not be reported as independent review.
+Never call self-review independent review.
 
-If a separate Reviewer cannot actually be delegated, label the result:
-
-```text
-self-review fallback
-```
+If a Reviewer subagent did run, do not later claim self-review fallback for the whole review phase.
 
 ---
 
-## 14. Lower-Level Skills Are Subordinate
+## 10. Final Delivery
 
-Implementation, research, testing, debugging, review, embedded, MATLAB/Simulink, documentation, frontend, backend, and other Skills may guide specialist work.
+Before finishing, confirm Runtime state matches reality.
 
-A Skill does not itself create an agent.
-
-Do not let lower-level Skills bypass the Manager and own an end-to-end request already owned by Auto Agent Team.
-
----
-
-## 15. Maintain Truthful Runtime State
-
-Internally track:
+Summarize:
 
 ```text
-Goal
-Assumptions
-Execution mode
-Real native subagents spawned
-Tasks
-Dependencies
-Owners
-File ownership
-Evidence
-Failures
-Root causes
-Integration decisions
-Verification state
-Review context
-Remaining blockers
+what was completed
+execution mode
+native subagents actually used
+verification performed
+review result
+blocking findings and how they were resolved
+remaining issues
 ```
 
-If Agent Team runtime tools are active, synchronize their state with these facts.
-
-Do not use runtime/dashboard state to fabricate progress.
-
----
-
-## 16. Respect Project Memory
-
-If applicable project rules use:
-
-```text
-AGENTS.md
-PROJECT_LOG.md
-```
-
-read and respect them.
-
-Only durable, confirmed project facts belong in long-term decisions.
-
-Do not create or modify memory files when current workspace rules prohibit it.
-
----
-
-## 17. Keep User Interaction Simple
-
-The user should normally be able to say:
-
-```text
-Build this application.
-```
-
-or:
-
-```text
-Fix this project.
-```
-
-Do not push orchestration choices back to the user.
-
-Ask only when a missing decision materially changes product direction, architecture, safety, privacy, cost, destructive behavior, credentials, or required hardware.
-
----
-
-## 18. Final Delivery
-
-The final response should normally include:
-
-```text
-Completed
-Execution mode: NATIVE_SUBAGENTS or SEQUENTIAL_ROLE_FALLBACK
-Native subagents actually used
-Verification performed
-Review type and result
-Important decisions
-Remaining issues
-```
-
-If the runtime/dashboard was used, its final state must agree with the final report.
-
-Do not expose every internal prompt or raw subagent transcript unless requested.
-
----
-
-## Final Principle
-
-The user defines the goal.
-
-The Manager owns the process.
-
-Native Codex subagents are the real delegation mechanism.
-
-Role files are playbooks.
-
-Skills are capabilities.
-
-The Agent Team runtime is the status ledger and UI data source.
-
-Success is reliable completion, real verification, real independence where claimed, and truthful orchestration.
+Do not expose raw subagent transcripts unless requested.
