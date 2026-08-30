@@ -500,4 +500,4 @@ v0.1.0
 
 ## License
 
-后续添加。
+本项目使用 MIT License。
