@@ -37,7 +37,7 @@ const native = (s, name) => s.nativeAgents.find(a => a.name === name);
 
 try {
   const init = await request("initialize", { protocolVersion: "2025-11-25" });
-  assert(init.serverInfo.version === "0.3.0-dev.3", "wrong runtime version");
+  assert(init.serverInfo.version === "0.3.0", "wrong runtime version");
   const list = await request("tools/list");
   assert(list.tools.length === 10, "expected 10 tools");
   assert(list.tools.some(t => t.name === "agent_team_subagent_started"), "missing subagent started tool");
@@ -108,6 +108,7 @@ try {
   const resource = await request("resources/read", { uri: "ui://auto-agent-team/team-dashboard.html" });
   const html = resource?.contents?.[0]?.text || "";
   assert(html.includes("原生子智能体") && html.includes("仍有 ${activeNative.length} 个原生子智能体运行中"), "dashboard should expose native subagent state");
+  assert(html.includes("主任务完成") && html.includes("动态子任务"), "dashboard should separate main and dynamic tasks");
 
   console.log("Auto Agent Team runtime smoke test passed.");
 } finally {
