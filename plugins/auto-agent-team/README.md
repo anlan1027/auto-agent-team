@@ -11,7 +11,7 @@ User goal
   ↓
 Auto Agent Team Skill / Manager
   ↓
-Native Codex subagents when available
+Native Codex subagents by default for suitable independent work
   ↓
 Agent Team MCP runtime
   ├─ .agent-team/team.json
@@ -33,7 +33,18 @@ NATIVE_SUBAGENTS
 SEQUENTIAL_ROLE_FALLBACK
 ```
 
-`UNKNOWN` is the correct initial state until delegation capability is proven. A successful native Codex subagent switches the runtime to `NATIVE_SUBAGENTS`. Fallback is used only when native delegation is actually unavailable or fails.
+`UNKNOWN` is the startup state until real native delegation is proven.
+
+`NATIVE_SUBAGENTS` is the default successful execution path for suitable independent work. A successful native Codex subagent switches the runtime to this mode.
+
+`SEQUENTIAL_ROLE_FALLBACK` is emergency single-Agent backup only. It should be used only after concrete evidence that native spawning is unavailable, unsupported, disabled, or an actual native spawn attempt failed. It is not the normal/default mode and must not be selected merely because the native spawn capability is not immediately visible.
+
+Dashboard labels reflect this policy:
+
+```text
+原生多 Agent（默认）
+保底模式（单 Agent）
+```
 
 ## Runtime tools
 
@@ -62,6 +73,8 @@ Runtime task:       t4
 ```
 
 When a native delegation succeeds, the Manager records it with `agent_team_subagent_started`. When it returns, fails, or is cancelled, the Manager records the terminal result with `agent_team_subagent_finished`.
+
+Ordinary chats, top-level tasks, `create_thread`, `fork_thread`, `handoff_thread`, or cross-task delegation do not count as native subagents.
 
 Active native subagents are a completion gate. The runtime does not allow a linked task to be marked done while its native subagent is still running, and `phase=completed` requires both:
 
