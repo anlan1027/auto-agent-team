@@ -104,21 +104,57 @@ function normalizeTasks(value) {
   }));
 }
 
+function normalizeState(state) {
+  state.schemaVersion ||= 2;
+  state.members = normalizeMembers(state.members);
+  state.tasks = normalizeTasks(state.tasks);
+  state.events = Array.isArray(state.events) ? state.events : [];
+  state.executionMode = EXECUTION_MODES.has(state.executionMode) ? state.executionMode : "UNKNOWN";
+  state.phase = PHASES.has(state.phase) ? state.phase : "planning";
+  return state;
+}
+
 function textAndStructured(text, structuredContent, meta) {
   const out = { content: [{ type: "text", text }], structuredContent };
   if (meta) out._meta = meta;
   return out;
 }
 
-function requiredWorkspaceState(args) {
+function optionalWorkspaceState(args) {
   const root = workspaceRoot(args?.workspacePath);
   const state = readState(root);
+  return { root, state: state ? normalizeState(state) : null };
+}
+
+function requiredWorkspaceState(args) {
+  const { root, state } = optionalWorkspaceState(args);
   if (!state) throw new Error(`No Agent Team state exists at ${statePath(root)}. Call agent_team_create first.`);
-  state.schemaVersion ||= 1;
-  state.members = normalizeMembers(state.members);
-  state.tasks = normalizeTasks(state.tasks);
-  state.events = Array.isArray(state.events) ? state.events : [];
   return { root, state };
+}
+
+function uninitializedDashboardState(root) {
+  return {
+    schemaVersion: 2,
+    id: "uninitialized-agent-team",
+    name: "Auto Agent Team",
+    description: "尚未初始化团队状态。Manager 应先创建本项目的 Agent Team，然后 Dashboard 会自动显示真实任务、成员和进度。",
+    executionMode: "UNKNOWN",
+    phase: "planning",
+    planReviewState: "not_required",
+    createdAt: null,
+    updatedAt: now(),
+    members: [],
+    tasks: [],
+    events: [
+      {
+        at: now(),
+        kind: "runtime_uninitialized",
+        message: `No Agent Team state exists yet at ${statePath(root)}. Waiting for agent_team_create.`,
+        memberId: null,
+        taskId: null
+      }
+    ]
+  };
 }
 
 function appendEvent(state, kind, message, memberId = null, taskId = null) {
@@ -153,6 +189,7 @@ function validateTaskGraph(state) {
   const byId = new Map(state.tasks.map(task => [task.id, task]));
   const visiting = new Set();
   const visited = new Set();
+
   function visit(id, stack) {
     if (visited.has(id)) return;
     if (visiting.has(id)) throw new Error(`Task dependency cycle detected: ${[...stack, id].join(" -> ")}`);
@@ -162,6 +199,7 @@ function validateTaskGraph(state) {
     visiting.delete(id);
     visited.add(id);
   }
+
   for (const task of state.tasks) visit(task.id, []);
 }
 
@@ -171,6 +209,7 @@ function reconcileDependencies(state) {
 
   for (let pass = 0; pass < Math.max(1, state.tasks.length); pass += 1) {
     let passChanged = false;
+
     for (const task of state.tasks) {
       if (TERMINAL_TASK_STATUSES.has(task.status)) continue;
 
@@ -209,6 +248,7 @@ function reconcileDependencies(state) {
         passChanged = true;
       }
     }
+
     changed ||= passChanged;
     if (!passChanged) break;
   }
@@ -218,6 +258,7 @@ function reconcileDependencies(state) {
 
 function reconcileMembers(state) {
   let changed = false;
+
   for (const member of state.members) {
     const assigned = state.tasks.filter(task => task.assignee === member.id || task.assignee === member.name);
     if (!assigned.length) continue;
@@ -232,6 +273,7 @@ function reconcileMembers(state) {
     let nextStatus = member.status;
     let nextTask = null;
     let summary = member.summary;
+
     const running = assigned.find(task => task.status === "running");
     const failed = assigned.find(task => task.status === "failed");
     const blocked = assigned.find(task => task.status === "blocked");
@@ -272,6 +314,7 @@ function reconcileMembers(state) {
       changed = true;
     }
   }
+
   return changed;
 }
 
@@ -298,6 +341,7 @@ function reconcileState(state) {
   let changed = false;
   changed = reconcileDependencies(state) || changed;
   changed = reconcileMembers(state) || changed;
+
   const nextPhase = derivePhase(state);
   if (state.phase !== nextPhase) {
     const previous = state.phase;
@@ -305,6 +349,7 @@ function reconcileState(state) {
     appendEvent(state, "phase_changed", `Phase ${previous || "unknown"} → ${nextPhase}.`);
     changed = true;
   }
+
   return changed;
 }
 
@@ -337,7 +382,7 @@ const tools = [
   {
     name: "agent_team_get",
     title: "Get Agent Team state",
-    description: "Read and reconcile current Agent Team state. Ready/blocked task transitions and task-derived member status are synchronized automatically.",
+    description: "Read and reconcile current Agent Team state. If no state exists yet, return initialized=false instead of failing so the Manager can create the team cleanly.",
     inputSchema: { type: "object", properties: { workspacePath: { type: "string" } }, required: ["workspacePath"] },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -395,7 +440,7 @@ const tools = [
   {
     name: "agent_team_render_dashboard",
     title: "Render Agent Team dashboard",
-    description: "Reconcile state and render the live DSH-style Agent Team dashboard.",
+    description: "Render the live DSH-style Agent Team dashboard. If no team exists yet, render an uninitialized dashboard instead of returning an MCP error.",
     inputSchema: {
       type: "object",
       properties: { workspacePath: { type: "string" } },
@@ -428,38 +473,61 @@ function callTool(name, args = {}) {
       tasks: normalizeTasks(args.tasks),
       events: []
     };
+
     validateTaskGraph(state);
     appendEvent(state, "team_created", `Created Agent Team with ${state.members.length} members and ${state.tasks.length} tasks.`);
     reconcileState(state);
     writeState(root, state);
-    return textAndStructured(`Created Agent Team "${state.name}".`, { workspacePath: root, team: state });
+
+    return textAndStructured(
+      `Created Agent Team "${state.name}".`,
+      { workspacePath: root, statePath: statePath(root), initialized: true, team: state }
+    );
   }
 
   if (name === "agent_team_get") {
-    const { root, state } = requiredWorkspaceState(args);
+    const { root, state } = optionalWorkspaceState(args);
+
+    if (!state) {
+      return textAndStructured(
+        "No Agent Team state exists yet. Create the team with agent_team_create before substantial project execution.",
+        { workspacePath: root, statePath: statePath(root), initialized: false, team: null }
+      );
+    }
+
     reconcileAndPersist(root, state);
-    return textAndStructured(`Loaded Agent Team "${state.name}".`, { workspacePath: root, team: state });
+    return textAndStructured(
+      `Loaded Agent Team "${state.name}".`,
+      { workspacePath: root, statePath: statePath(root), initialized: true, team: state }
+    );
   }
 
   if (name === "agent_team_update_member") {
     const { root, state } = requiredWorkspaceState(args);
     const member = state.members.find(m => m.id === args.memberId || m.name === args.memberId);
     if (!member) throw new Error(`Unknown member: ${args.memberId}`);
+
     if (args.status !== undefined) {
       if (!MEMBER_STATUSES.has(args.status)) throw new Error(`Invalid member status: ${args.status}`);
       member.status = args.status;
       member.statusSource = "manual";
     }
+
     if (Object.hasOwn(args, "currentTask")) {
       if (args.currentTask !== null && !state.tasks.some(task => task.id === args.currentTask)) {
         throw new Error(`Unknown currentTask: ${args.currentTask}`);
       }
       member.currentTask = args.currentTask;
     }
+
     if (typeof args.summary === "string") member.summary = args.summary;
     appendEvent(state, "member_update", `${member.name} → ${member.status}.`, member.id, member.currentTask);
     writeState(root, state);
-    return textAndStructured(`Updated member ${member.name}.`, { workspacePath: root, team: state });
+
+    return textAndStructured(
+      `Updated member ${member.name}.`,
+      { workspacePath: root, statePath: statePath(root), initialized: true, team: state }
+    );
   }
 
   if (name === "agent_team_update_task") {
@@ -477,14 +545,21 @@ function callTool(name, args = {}) {
       task.blockedBy = [];
       if (args.status === "running" && !task.startedAt) task.startedAt = task.statusChangedAt;
       if (args.status === "done") task.completedAt = task.statusChangedAt;
-      if (previous !== task.status) appendEvent(state, "task_update", `${task.id} ${previous} → ${task.status}.`, task.assignee, task.id);
+      if (previous !== task.status) {
+        appendEvent(state, "task_update", `${task.id} ${previous} → ${task.status}.`, task.assignee, task.id);
+      }
     }
+
     if (typeof args.result === "string") task.result = args.result;
     if (Array.isArray(args.evidence)) task.evidence = args.evidence.map(String);
 
     reconcileState(state);
     writeState(root, state);
-    return textAndStructured(`Updated task ${task.id}.`, { workspacePath: root, team: state });
+
+    return textAndStructured(
+      `Updated task ${task.id}.`,
+      { workspacePath: root, statePath: statePath(root), initialized: true, team: state }
+    );
   }
 
   if (name === "agent_team_append_event") {
@@ -497,15 +572,29 @@ function callTool(name, args = {}) {
       args.taskId ?? null
     );
     writeState(root, state);
-    return textAndStructured("Recorded Agent Team event.", { workspacePath: root, team: state });
+
+    return textAndStructured(
+      "Recorded Agent Team event.",
+      { workspacePath: root, statePath: statePath(root), initialized: true, team: state }
+    );
   }
 
   if (name === "agent_team_render_dashboard") {
-    const { root, state } = requiredWorkspaceState(args);
-    reconcileAndPersist(root, state);
+    const { root, state } = optionalWorkspaceState(args);
+    const dashboardState = state || uninitializedDashboardState(root);
+
+    if (state) reconcileAndPersist(root, dashboardState);
+
     return textAndStructured(
-      `Showing Agent Team dashboard for "${state.name}".`,
-      { workspacePath: root, team: state },
+      state
+        ? `Showing Agent Team dashboard for "${dashboardState.name}".`
+        : "Showing an uninitialized Agent Team dashboard. Create the team with agent_team_create to begin tracking this project.",
+      {
+        workspacePath: root,
+        statePath: statePath(root),
+        initialized: Boolean(state),
+        team: dashboardState
+      },
       { ui: { resourceUri: TEMPLATE_URI }, "openai/outputTemplate": TEMPLATE_URI }
     );
   }
@@ -519,18 +608,21 @@ function handle(id, method, params) {
       protocolVersion: params?.protocolVersion ?? "2025-11-25",
       capabilities: { tools: {}, resources: {} },
       serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-      instructions: "Maintain truthful DSH-style Agent Team state for the current workspace. The runtime automatically reconciles task dependencies, task-derived member state, and workflow phase. Native Codex subagents remain the real execution mechanism; this runtime records and renders status only."
+      instructions: "Maintain truthful DSH-style Agent Team state for the current workspace. For qualifying local projects, the Manager should get/create team state, render the dashboard early, and keep task/member state synchronized through completion. Missing initial state is not an MCP error: agent_team_get returns initialized=false and agent_team_render_dashboard can render an uninitialized dashboard. Native Codex subagents remain the real execution mechanism; this runtime records and renders status only."
     });
     return;
   }
+
   if (method === "ping") {
     result(id, {});
     return;
   }
+
   if (method === "tools/list") {
     result(id, { tools });
     return;
   }
+
   if (method === "tools/call") {
     try {
       result(id, callTool(params?.name, params?.arguments ?? {}));
@@ -539,6 +631,7 @@ function handle(id, method, params) {
     }
     return;
   }
+
   if (method === "resources/list") {
     result(id, {
       resources: [
@@ -551,11 +644,13 @@ function handle(id, method, params) {
     });
     return;
   }
+
   if (method === "resources/read") {
     if (params?.uri !== TEMPLATE_URI) {
       error(id, JsonRpcError.INVALID_PARAMS, `Unknown resource: ${params?.uri ?? ""}`);
       return;
     }
+
     try {
       const html = fs.readFileSync(UI_PATH, "utf8");
       result(id, {
@@ -573,6 +668,7 @@ function handle(id, method, params) {
     }
     return;
   }
+
   if (id !== undefined) {
     error(id, JsonRpcError.METHOD_NOT_FOUND, `Method not found: ${method}`);
   }
