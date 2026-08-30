@@ -17,8 +17,9 @@ $manifest = Join-Path $source ".codex-plugin\plugin.json"
 $mcpConfig = Join-Path $source ".mcp.json"
 $server = Join-Path $source "mcp\server.mjs"
 $dashboard = Join-Path $source "ui\team-dashboard.html"
+$smokeTest = Join-Path $source "scripts\smoke-test.mjs"
 
-foreach ($required in @($manifest, $mcpConfig, $server, $dashboard)) {
+foreach ($required in @($manifest, $mcpConfig, $server, $dashboard, $smokeTest)) {
     if (-not (Test-Path $required)) {
         throw "Required plugin file not found: $required"
     }
@@ -28,16 +29,20 @@ foreach ($required in @($manifest, $mcpConfig, $server, $dashboard)) {
 Get-Content $manifest -Raw | ConvertFrom-Json | Out-Null
 Get-Content $mcpConfig -Raw | ConvertFrom-Json | Out-Null
 
-# Validate the zero-dependency Node MCP server when Node is available.
+# The runtime is a local Node MCP server. Validate it before installation.
 $node = Get-Command node -ErrorAction SilentlyContinue
-if ($node) {
-    & $node.Source --check $server
-    if ($LASTEXITCODE -ne 0) {
-        throw "Node syntax validation failed for $server"
-    }
+if (-not $node) {
+    throw "Node.js is required by the Auto Agent Team MCP runtime, but 'node' was not found in PATH."
 }
-else {
-    Write-Warning "Node.js was not found. The plugin can be copied, but its MCP runtime will not start until Node.js is available."
+
+& $node.Source --check $server
+if ($LASTEXITCODE -ne 0) {
+    throw "Node syntax validation failed for $server"
+}
+
+& $node.Source $smokeTest
+if ($LASTEXITCODE -ne 0) {
+    throw "Auto Agent Team MCP runtime smoke test failed. Installation was not changed."
 }
 
 New-Item -ItemType Directory -Force -Path $pluginsRoot | Out-Null
