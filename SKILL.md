@@ -1,6 +1,6 @@
 ---
 name: auto-agent-team
-description: Top-level multi-agent orchestrator for end-to-end software engineering. Prefer this skill for complete projects, substantial features, complex repairs, project completion, self-directed requirement analysis, automatic task decomposition, useful parallel work, implementation plus verification, debugging, or independent review. Use native Codex subagent workflows for real delegation when suitable, and use the optional Auto Agent Team runtime/dashboard tools when available to expose DSH-style team state without making the user manage agents manually. Do not simulate subagents by creating unrelated top-level chats. Do not use this skill for trivial explanations, isolated snippets, tiny edits, or single-step questions where orchestration adds no value.
+description: Top-level multi-agent orchestrator for end-to-end software engineering. Prefer this skill for complete projects, substantial features, complex repairs, project completion, self-directed requirement analysis, automatic task decomposition, useful parallel work, implementation plus verification, debugging, or independent review. Use native Codex subagent workflows for real delegation when suitable. For qualifying complex work with a local workspace, if Auto Agent Team Runtime tools are available, using the runtime and dashboard is part of the required orchestration lifecycle even when execution falls back to sequential roles. Do not simulate subagents by creating unrelated top-level chats. Do not use this skill for trivial explanations, isolated snippets, tiny edits, or single-step questions where orchestration adds no value.
 ---
 
 # Auto Agent Team
@@ -25,6 +25,7 @@ integration
 testing
 debugging
 review
+runtime/dashboard state
 final delivery
 ```
 
@@ -64,18 +65,18 @@ Integration
 ↓
 Verification
 ↓
-Independent Review
+Review
 ↓
 Final Delivery
 ```
 
-Do not let a narrower implementation, testing, debugging, or review skill independently take over the whole project when Auto Agent Team clearly applies.
+Do not let a narrower implementation, testing, debugging, or review skill independently take over the whole request when Auto Agent Team clearly applies.
 
 ---
 
 # 2. Native Codex Subagents Are the Preferred Delegation Mechanism
 
-For meaningful independent work, explicitly use the native Codex subagent workflow exposed by the current Codex host.
+For meaningful independent work, explicitly use the native Codex subagent workflow exposed by the current Codex host when it is actually available.
 
 Suitable delegated work includes:
 
@@ -103,7 +104,7 @@ Manually creating an unrelated top-level chat/task to imitate an agent
 
 Do not use generic `create_thread`, `fork_thread`, `handoff_thread`, new-chat creation, or equivalent user-task creation merely to simulate internal team members.
 
-Do not conclude that subagents are unavailable merely because no tool literally named `background_agent` is visible. First attempt the native Codex subagent/delegation workflow when the task warrants it.
+Do not conclude that subagents are unavailable merely because no tool literally named `background_agent` is visible. Attempt the native Codex delegation path when the task warrants it and the host exposes a supported mechanism.
 
 If native subagent delegation is unavailable, disabled, or actually fails, use:
 
@@ -152,42 +153,121 @@ Critical definitions:
 
 ---
 
-# 4. Agent Team Runtime and Dashboard
+# 4. Mandatory Agent Team Runtime Lifecycle
 
-When the Auto Agent Team plugin/runtime tools are available and a local workspace exists, use them as the orchestration-status ledger.
+For a qualifying complex or end-to-end project, if all three conditions are true:
+
+```text
+1. Auto Agent Team owns the request.
+2. A local workspace/project directory exists.
+3. Auto Agent Team Runtime tools are available.
+```
+
+then Runtime use is **mandatory**, not optional and not merely recommended.
 
 Expected tools may include:
 
 ```text
-agent_team_create
 agent_team_get
+agent_team_create
 agent_team_update_member
 agent_team_update_task
 agent_team_append_event
 agent_team_render_dashboard
 ```
 
-Recommended flow:
+## Required startup sequence
+
+Before substantial implementation begins:
 
 ```text
 inspect workspace
 ↓
+initialize/read project memory when higher-priority rules require it
+↓
 build compact team + task graph
 ↓
-agent_team_create
+agent_team_get
+↓
+if no relevant team state exists:
+    agent_team_create
 ↓
 agent_team_render_dashboard
 ↓
-delegate / execute work
-↓
-update members and tasks truthfully
-↓
-verify
-↓
-review
-↓
-final state
+only then begin substantial implementation/delegation
 ```
+
+Do not skip `agent_team_render_dashboard` merely because the user did not explicitly ask to see it.
+
+Do not skip Runtime state merely because native subagents are unavailable. In fallback mode, still create/read the team state, render the dashboard, and synchronize the real sequential stages.
+
+## Existing state rule
+
+If `agent_team_get` returns existing state, decide whether it represents the current project/run.
+
+- Reuse it when it is the same continuing project and state is still relevant.
+- Replace it with `agent_team_create` when the workspace is being used for a new unrelated project/run and the old state would be misleading.
+- Never silently carry stale task completion into a new project.
+
+## Required execution synchronization
+
+At real execution boundaries, keep Runtime state aligned with what actually happened.
+
+Examples:
+
+```text
+implementation starts
+→ implementation task = running
+
+implementation completes with evidence
+→ implementation task = done
+
+verification starts
+→ verification task = running
+
+verification passes
+→ verification task = done + concise evidence
+
+verification fails
+→ task = failed or blocked, record evidence, begin recovery
+
+review starts
+→ review task = running
+
+review completes
+→ review task = done + result
+
+all required work completes
+→ final tasks = done and runtime reaches completed
+```
+
+Use member updates when they represent real native-agent activity or when explicit member status adds truthful information. The Runtime scheduler may derive member state from tasks; do not fight the scheduler with invented statuses.
+
+## Finalization requirement
+
+Before the final answer on a Runtime-enabled project:
+
+```text
+synchronize final task results
+↓
+record verification evidence
+↓
+record review mode/result
+↓
+confirm final Runtime state
+↓
+then deliver to the user
+```
+
+A project is not properly orchestrated if the code is finished but Runtime state is still stale at an earlier phase.
+
+## Runtime truthfulness
+
+The runtime is a status ledger, not a substitute for engineering evidence.
+
+Real files, commands, tests, simulations, and native subagent results remain the source of truth.
+
+Never fabricate task/member completion merely to make the dashboard look finished.
 
 The runtime records state under:
 
@@ -195,11 +275,7 @@ The runtime records state under:
 .agent-team/team.json
 ```
 
-Do not create runtime state when there is no local workspace.
-
-Do not fabricate statuses. A task or member becomes `done` only after the real work completed.
-
-The dashboard is visibility, not the source of engineering truth. Real files, commands, tests, and subagent results remain the evidence.
+Do not create Runtime state when there is no local workspace.
 
 ---
 
@@ -264,6 +340,8 @@ Independent work may run in parallel. Dependent work must remain ordered.
 
 For concurrent writing agents, assign non-overlapping file or module ownership wherever possible.
 
+When Runtime is active, reflect the same dependency graph in Runtime tasks rather than maintaining a contradictory second plan.
+
 ---
 
 # 7. Select the Smallest Effective Team
@@ -322,7 +400,7 @@ Other Skills may guide implementation, research, review, testing, debugging, emb
 
 When Auto Agent Team owns the request, lower-level Skills are subordinate capabilities inside the Manager-owned task graph.
 
-Loading a lower-level Skill does not itself create a subagent.
+Loading a lower-level Skill does not itself create a subagent and does not replace the mandatory Runtime lifecycle when Runtime is available.
 
 ---
 
@@ -365,6 +443,8 @@ Regression coverage
 Re-run verification
 ```
 
+When Runtime is active, reflect failure/recovery state there as it occurs.
+
 Never claim a check passed unless it actually ran.
 
 ---
@@ -382,6 +462,8 @@ Review mode: self-review fallback
 ```
 
 rather than claiming independent approval.
+
+When Runtime is active, record the actual review mode/result truthfully. A logical Reviewer role in the dashboard does not prove an independent subagent existed.
 
 ---
 
@@ -422,6 +504,8 @@ unless the user explicitly wants manual control.
 
 Ask only when a missing decision materially affects product direction, safety, privacy, cost, destructive behavior, credentials, required hardware, or an irreversible architecture choice.
 
+Do not ask the user whether to open the Dashboard when Runtime is available for a qualifying project; open it as part of the workflow.
+
 ---
 
 # 13. Truthfulness Gate
@@ -437,9 +521,9 @@ root cause without evidence
 successful integration without validation
 ```
 
-Keep internal state consistent with what actually happened.
+Keep Runtime state consistent with what actually happened.
 
-If the Agent Team runtime is active, keep its member/task status consistent with real execution.
+If Runtime is available but could not be used because a real tool call failed, report the failure rather than pretending the Runtime lifecycle completed.
 
 ---
 
@@ -455,7 +539,7 @@ Verification performed
 Review type and result
 Important decisions
 Remaining issues
-Dashboard/runtime state if relevant
+Runtime/dashboard final state when active
 ```
 
 Do not expose raw subagent transcripts unless requested.
@@ -472,7 +556,7 @@ Skills are capabilities.
 
 Native Codex subagents are the real delegation mechanism.
 
-The Agent Team runtime is the status ledger and dashboard data source.
+The Agent Team Runtime is the required status ledger and dashboard data source for qualifying local projects when those tools are available.
 
 The user defines the goal.
 
