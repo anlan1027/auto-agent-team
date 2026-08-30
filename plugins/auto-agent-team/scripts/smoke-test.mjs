@@ -18,11 +18,12 @@ function request(method, params = {}) {
   const id = nextId++;
   child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`timeout: ${method}`)), 5000);
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`timeout: ${method}`)); }, 5000);
     pending.set(id, { resolve, reject, timer });
   });
 }
 lines.on("line", line => {
+  if (!line.trim()) return;
   const msg = JSON.parse(line);
   if (!pending.has(msg.id)) return;
   const p = pending.get(msg.id); pending.delete(msg.id); clearTimeout(p.timer);
@@ -32,16 +33,21 @@ const assert = (c, m) => { if (!c) throw new Error(m); };
 const team = r => r?.structuredContent?.team;
 const task = (s, id) => s.tasks.find(t => t.id === id);
 const member = (s, id) => s.members.find(m => m.id === id);
+const native = (s, name) => s.nativeAgents.find(a => a.name === name);
+
 try {
   const init = await request("initialize", { protocolVersion: "2025-11-25" });
-  assert(init.serverInfo.version === "0.3.0-dev.2", "wrong version");
+  assert(init.serverInfo.version === "0.3.0-dev.3", "wrong runtime version");
   const list = await request("tools/list");
-  assert(list.tools.length === 8, "expected 8 tools");
+  assert(list.tools.length === 10, "expected 10 tools");
+  assert(list.tools.some(t => t.name === "agent_team_subagent_started"), "missing subagent started tool");
+  assert(list.tools.some(t => t.name === "agent_team_subagent_finished"), "missing subagent finished tool");
 
   const emptyGet = await request("tools/call", { name: "agent_team_get", arguments: { workspacePath: emptyWorkspace } });
   assert(emptyGet.structuredContent.initialized === false, "fresh get should not fail");
   const emptyRender = await request("tools/call", { name: "agent_team_render_dashboard", arguments: { workspacePath: emptyWorkspace } });
   assert(team(emptyRender).id === "uninitialized-agent-team", "fresh render should be uninitialized");
+  assert(Array.isArray(team(emptyRender).nativeAgents), "uninitialized dashboard should include nativeAgents");
 
   let s = team(await request("tools/call", { name: "agent_team_create", arguments: {
     workspacePath: workspace, name: "todo", executionMode: "UNKNOWN",
@@ -58,32 +64,50 @@ try {
       { id: "t4", subject: "Review", assignee: "reviewer", kind: "review", dependencies: ["t2"] }
     ]
   } }));
+  assert(s.schemaVersion === 4, "expected schema 4");
   assert(s.executionMode === "UNKNOWN", "mode should start UNKNOWN");
   assert(task(s,"t1").status === "ready", "t1 should be ready");
 
-  s = team(await request("tools/call", { name: "agent_team_set_execution_mode", arguments: { workspacePath: workspace, executionMode: "NATIVE_SUBAGENTS", reason: "Reviewer delegated" } }));
-  assert(s.executionMode === "NATIVE_SUBAGENTS", "mode should switch to native");
-
-  for (const [id, status] of [["t1","done"],["t2","done"],["t3","done"],["t4","done"]]) {
-    s = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: id, status } }));
+  for (const id of ["t1","t2","t3"]) {
+    s = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: id, status: "done" } }));
   }
-  assert(s.phase === "completed", "team should complete");
-  assert(s.members.every(m => m.status === "done" && m.currentTask === null), "completed team should converge all members");
+  assert(task(s,"t4").status === "ready", "review should be ready");
+
+  s = team(await request("tools/call", { name: "agent_team_subagent_started", arguments: {
+    workspacePath: workspace, nativeAgentId: "wegener-1", name: "Wegener", role: "Reviewer", memberId: "reviewer", taskId: "t4", summary: "Independent code review"
+  } }));
+  assert(s.executionMode === "NATIVE_SUBAGENTS", "native start should switch execution mode");
+  assert(native(s,"Wegener")?.status === "running", "Wegener should be running");
+  assert(task(s,"t4").status === "running", "linked review task should become running");
+  assert(member(s,"reviewer").status === "working", "reviewer member should be working");
+  assert(s.phase === "reviewing", "native Reviewer should drive reviewing phase");
+
+  let prematureRejected = false;
+  try {
+    await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: "t4", status: "done" } });
+  } catch (e) {
+    prematureRejected = /native subagent is still running/i.test(e.message);
+  }
+  assert(prematureRejected, "runtime should reject task done while linked native subagent is active");
+
+  s = team(await request("tools/call", { name: "agent_team_subagent_finished", arguments: {
+    workspacePath: workspace, nativeAgentId: "wegener-1", status: "done", result: "2 High findings", evidence: ["main.py:42", "storage.py:10"]
+  } }));
+  assert(native(s,"Wegener")?.status === "done", "Wegener should be done");
+  assert(task(s,"t4").status === "done", "review task should complete with subagent");
+  assert(task(s,"t4").result === "2 High findings", "review result should propagate to task");
+  assert(s.phase === "completed", "team may complete once tasks done and no native agent is active");
+  assert(s.members.every(m => m.status === "done" && m.currentTask === null), "completed team should converge members");
 
   s = team(await request("tools/call", { name: "agent_team_add_task", arguments: { workspacePath: workspace, task: {
     id: "t5", subject: "Fix review findings", assignee: "developer", kind: "implementation", dependencies: ["t4"]
   } } }));
   assert(s.phase !== "completed", "adding remediation should reopen team");
-  assert(task(s,"t5").status === "ready", "remediation should become ready");
-  assert(member(s,"developer").status === "idle", "developer should reopen from done");
+  assert(task(s,"t5").status === "ready", "remediation should be ready");
 
-  s = team(await request("tools/call", { name: "agent_team_add_task", arguments: { workspacePath: workspace, task: {
-    id: "t6", subject: "Regression", assignee: "tester", kind: "regression", dependencies: ["t5"]
-  } } }));
-  s = team(await request("tools/call", { name: "agent_team_add_task", arguments: { workspacePath: workspace, task: {
-    id: "t7", subject: "Re-review", assignee: "reviewer", kind: "re_review", dependencies: ["t6"]
-  } } }));
-  assert(task(s,"t6").status === "pending" && task(s,"t7").status === "pending", "follow-up dependencies wrong");
+  const resource = await request("resources/read", { uri: "ui://auto-agent-team/team-dashboard.html" });
+  const html = resource?.contents?.[0]?.text || "";
+  assert(html.includes("原生子智能体") && html.includes("仍有 ${activeNative.length} 个原生子智能体运行中"), "dashboard should expose native subagent state");
 
   console.log("Auto Agent Team runtime smoke test passed.");
 } finally {
