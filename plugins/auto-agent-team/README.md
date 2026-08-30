@@ -11,7 +11,7 @@ User goal
   ↓
 Auto Agent Team Skill / Manager
   ↓
-Native Codex subagents when available
+Native Codex subagents
   ↓
 Agent Team MCP runtime
   ├─ .agent-team/team.json
@@ -23,9 +23,9 @@ MCP Apps dashboard
 
 The host decides where the dashboard is rendered. The plugin cannot force a permanent Codex right-side panel.
 
-## Execution modes
+## Runtime states
 
-There are three runtime execution modes:
+The runtime keeps three compatibility states:
 
 ```text
 UNKNOWN
@@ -33,7 +33,13 @@ NATIVE_SUBAGENTS
 SEQUENTIAL_ROLE_FALLBACK
 ```
 
-`UNKNOWN` is the correct initial state until delegation capability is proven. A successful native Codex subagent switches the runtime to `NATIVE_SUBAGENTS`. Fallback is used only when native delegation is actually unavailable or fails.
+Their meaning is intentionally asymmetric:
+
+- `UNKNOWN`: startup; native delegation has not been proven yet. Agent Team is not established yet.
+- `NATIVE_SUBAGENTS`: at least one real native Codex subagent was successfully delegated. Agent Team is established. This is the normal successful mode.
+- `SEQUENTIAL_ROLE_FALLBACK`: native delegation was genuinely unavailable or failed. Agent Team is **not** established. This is emergency single-context backup only.
+
+The dashboard must never present fallback as another healthy multi-agent mode. It displays fallback as **Agent Team unavailable / not established**.
 
 ## Runtime tools
 
@@ -63,14 +69,28 @@ Runtime task:       t4
 
 When a native delegation succeeds, the Manager records it with `agent_team_subagent_started`. When it returns, fails, or is cancelled, the Manager records the terminal result with `agent_team_subagent_finished`.
 
-Active native subagents are a completion gate. The runtime does not allow a linked task to be marked done while its native subagent is still running, and `phase=completed` requires both:
+Active native subagents are a completion gate. The runtime does not allow a linked task to be marked done while its native subagent is still running, and final native Agent Team completion requires:
 
 ```text
+executionMode = NATIVE_SUBAGENTS
 all current tasks are done
 active native subagents = 0
+required verification is complete
+blocking review findings are resolved
 ```
 
-The dashboard shows native subagent display name, logical role, task, status, result, and evidence when recorded.
+A fallback run may still finish the software task, but its final report must say that a real Agent Team was not established.
+
+## Logical team integrity
+
+Runtime task assignees should map to logical members. A state such as:
+
+```text
+4 assigned tasks
+0 logical members
+```
+
+is invalid orchestration even if the tasks themselves can run. The Manager should create the smallest logical team that matches the task graph.
 
 ## Review remediation loop
 
@@ -82,7 +102,7 @@ Fix review findings
 → Re-review
 ```
 
-The scheduler can reopen a previously completed team when new remediation tasks are added.
+The scheduler can reopen a previously completed workflow when new remediation tasks are added.
 
 ## Runtime verification
 
@@ -92,7 +112,7 @@ Run:
 node ./scripts/smoke-test.mjs
 ```
 
-The smoke test verifies fresh-workspace behavior, native-subagent lifecycle tracking, execution-mode switching, linked-task completion gating, dependency scheduling, final member convergence, dashboard native-agent data, and remediation reopening.
+The smoke test verifies fresh-workspace behavior, native-subagent lifecycle tracking, execution-mode switching, linked-task completion gating, dependency scheduling, final member convergence, dashboard Agent Team establishment semantics, and remediation reopening.
 
 ## State
 
