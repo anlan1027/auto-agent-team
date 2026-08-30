@@ -1,0 +1,43 @@
+{
+  "name": "auto-agent-team",
+  "version": "0.2.0",
+  "description": "Coordinate native Codex subagents and show DSH-style team state, tasks, dependencies, verification, and review in a live dashboard.",
+  "author": {
+    "name": "anlan1027",
+    "url": "https://github.com/anlan1027"
+  },
+  "homepage": "https://github.com/anlan1027/auto-agent-team",
+  "repository": "https://github.com/anlan1027/auto-agent-team",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "agents",
+    "subagents",
+    "multi-agent",
+    "orchestration",
+    "dashboard",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Auto Agent Team",
+    "shortDescription": "Native Codex subagent orchestration with a live team dashboard",
+    "longDescription": "Turns broad software goals into a Manager-owned task graph, delegates suitable work to native Codex subagents, records DSH-style team/task state, and renders a live MCP Apps dashboard for members, dependencies, progress, verification, and review.",
+    "developerName": "anlan1027",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/anlan1027/auto-agent-team",
+    "defaultPrompt": [
+      "Build this project with Auto Agent Team and show the team dashboard.",
+      "Split this work across native Codex subagents, verify it, and review it.",
+      "Open the Auto Agent Team dashboard for this workspace."
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}
