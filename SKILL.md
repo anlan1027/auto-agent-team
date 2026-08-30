@@ -1,6 +1,6 @@
 ---
 name: auto-agent-team
-description: Top-level multi-agent orchestrator for end-to-end software engineering. Prefer this skill for complete projects, project-building requests, substantial features, complex repairs, project completion, self-directed requirement analysis, automatic task decomposition, implementation plus verification, debugging, or independent review. Use the host's real native Codex subagent mechanism for delegation when available. For any Auto-Agent-Team-owned local project, if Auto Agent Team Runtime tools are available or selectable, Runtime startup is a PRE-IMPLEMENTATION HARD GATE: get/create team state and render the dashboard before lower-level execution begins. Do not silently skip Runtime. Do not simulate subagents with ordinary chats, tasks, threads, or cross-task delegation. Do not use this skill for trivial explanations, isolated snippets, tiny edits, or single-step questions where orchestration adds no value.
+description: Top-level multi-agent orchestrator for end-to-end software engineering. Prefer this skill for complete projects, project-building requests, substantial features, complex repairs, project completion, self-directed requirement analysis, automatic task decomposition, implementation plus verification, debugging, or independent review. Default to the host's real native Codex subagent mechanism for suitable independent work. For any Auto-Agent-Team-owned local project, if Auto Agent Team Runtime tools are available or selectable, Runtime startup is a PRE-IMPLEMENTATION HARD GATE: get/create team state and render the dashboard before lower-level execution begins. Sequential single-context execution is emergency backup only after concrete native-spawn unavailability/failure evidence; it is never the default. Do not simulate subagents with ordinary chats, tasks, threads, or cross-task delegation. Do not use this skill for trivial explanations, isolated snippets, tiny edits, or single-step questions where orchestration adds no value.
 ---
 
 # Auto Agent Team
@@ -30,7 +30,7 @@ Runtime startup gate
 ↓
 Compact Task Graph + Logical Team
 ↓
-Native Codex Subagents for suitable independent work
+REAL Native Codex Subagents by default for suitable independent work
 ↓
 Manager integration
 ↓
@@ -128,7 +128,7 @@ Do not infer Runtime is unavailable merely because the source card is not visibl
 
 # 4. Native Codex Subagents — Identity Contract
 
-For meaningful independent work, use the host's **native Codex subagent spawning capability** when available.
+For meaningful independent work, use the host's **native Codex subagent spawning capability**.
 
 Suitable native work:
 
@@ -164,15 +164,25 @@ Do not probe native-agent availability by creating ordinary tasks or threads. Us
 
 ---
 
-# 5. Native-Agent-First, Without Replacing Host Behavior
+# 5. Native-Agent-First Is the Default
 
-For a normal complete project, when the current Codex host exposes native subagents, delegate useful independent work through that native mechanism.
+For a normal complete project, **native Codex subagents are the default execution path** for suitable independent work.
 
-The Manager may perform planning, integration, coordination, and tightly coupled work itself. Do not force every task into a subagent merely to increase agent count.
+After Runtime startup, the Manager should prefer real native delegation for independent research, architecture, implementation, testing, debugging, and review. Use multiple native agents when they add real value; parallelize independent work when safe.
 
-Use multiple native agents when they add real value, especially for independent implementation, testing, debugging, research, or review.
+The Manager may still perform planning, coordination, integration, and tightly coupled work itself. Do not force every tiny task into a subagent merely to increase agent count.
 
-Do not intentionally choose single-context execution merely because it is simpler when useful native delegation is available.
+Do NOT enter backup mode merely because:
+
+```text
+no tool is literally named background_agent
+no native agent is visible yet
+planning happened in Manager context
+the current tool list does not visibly advertise spawn_agent
+executionMode is still UNKNOWN
+```
+
+Before using backup, there must be concrete evidence that the real native path is unavailable, unsupported, disabled, or that an actual native spawn attempt failed.
 
 A successful real native delegation proves:
 
@@ -180,13 +190,18 @@ A successful real native delegation proves:
 executionMode = NATIVE_SUBAGENTS
 ```
 
-If native delegation is genuinely unavailable/unsupported or a real native spawn attempt fails, use:
+## Emergency backup only
+
+`SEQUENTIAL_ROLE_FALLBACK` means **single-Agent backup execution**, not a normal mode and not the default.
+
+Use it only after concrete native-spawn failure/unavailability evidence. Record the actual reason. Never choose it because it is simpler or because native capability was not immediately obvious.
 
 ```text
-SEQUENTIAL_ROLE_FALLBACK
+Default: NATIVE_SUBAGENTS via real native spawn
+Backup only: SEQUENTIAL_ROLE_FALLBACK after concrete failure evidence
 ```
 
-and report the actual reason. Fallback is not proof of a multi-agent team.
+Fallback is not proof of a multi-agent team.
 
 ---
 
@@ -306,7 +321,7 @@ ordinary cross-task conversation
 logical Reviewer row without a native Reviewer
 ```
 
-If no native Reviewer can run, report self-review/fallback truthfully.
+If no native Reviewer can run, report self-review/backup truthfully.
 
 Blocking review findings require follow-up work such as:
 
@@ -331,7 +346,7 @@ Runtime state matches reality
 ```
 
 If native subagents were actually used, report `NATIVE_SUBAGENTS` and the real agents used.
-If only fallback execution occurred, do not present it as successful native multi-agent collaboration.
+If only backup execution occurred, do not present it as successful native multi-agent collaboration.
 
 ---
 
@@ -365,7 +380,7 @@ Runtime startup gate
 ↓
 Manager + compact task graph
 ↓
-REAL native Codex subagents when useful
+DEFAULT: REAL native Codex subagents for suitable work
 ↓
 Integrate
 ↓
@@ -376,6 +391,10 @@ Independent native Review when available
 Remediate
 ↓
 Truthful delivery
+
+Only if native spawn is concretely unavailable/failed:
+↓
+Single-Agent backup (SEQUENTIAL_ROLE_FALLBACK)
 ```
 
-Preserve Codex's native subagent workflow. Improve orchestration and triggering around it; do not replace native subagents with ordinary conversations or artificial task-thread delegation.
+Preserve Codex's native subagent workflow. Native multi-Agent collaboration is the default; sequential single-context execution is only the emergency backup path.
