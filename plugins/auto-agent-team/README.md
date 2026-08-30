@@ -1,31 +1,35 @@
 # Auto Agent Team Plugin
 
-Current stable version: **v0.3.0**.
+<p align="center">
+  中文 | <a href="README_EN.md">English</a>
+</p>
 
-This directory contains the optional Codex Plugin layer for Auto Agent Team.
+当前稳定版本：**v0.3.0**。
 
-The root `SKILL.md` remains the top-level orchestration Skill. The plugin provides a local MCP Runtime and DSH-style Dashboard; it does not install a duplicate Skill.
+这个目录包含 Auto Agent Team 的可选 Codex Plugin 层。
 
-## Architecture
+根目录的 `SKILL.md` 仍然负责顶层编排；Plugin 提供本地 MCP Runtime 与 DSH 风格 Dashboard，不会重复安装第二份 Skill。
+
+## 架构
 
 ```text
-User goal
+用户目标
   ↓
 Auto Agent Team Skill / Manager
   ↓
-Native Codex subagents by default for suitable independent work
+默认优先使用原生 Codex 子 Agent 执行适合的独立任务
   ↓
 Agent Team MCP Runtime
   ├─ .agent-team/team.json
-  ├─ task/dependency state
-  └─ native-subagent lifecycle ledger
+  ├─ 任务 / 依赖状态
+  └─ 原生子 Agent 生命周期账本
   ↓
-MCP Apps dashboard
+MCP Apps Dashboard
 ```
 
-The Codex Host decides where the Dashboard is rendered. The plugin cannot force a permanent native right-side panel.
+Dashboard 最终显示位置由 Codex Host 决定。Plugin 无法强制把它永久固定在 Codex 原生右侧栏。
 
-## Execution modes
+## 执行模式
 
 ```text
 UNKNOWN
@@ -33,11 +37,11 @@ NATIVE_SUBAGENTS
 SEQUENTIAL_ROLE_FALLBACK
 ```
 
-- `UNKNOWN`: startup state until execution capability is proven.
-- `NATIVE_SUBAGENTS`: default successful path after at least one real native Codex subagent is recorded.
-- `SEQUENTIAL_ROLE_FALLBACK`: emergency single-Agent backup only after concrete native-spawn unavailability, disablement, lack of support, or an actual spawn failure.
+- `UNKNOWN`：启动状态，等待真实执行能力得到确认。
+- `NATIVE_SUBAGENTS`：默认成功路径；至少一个真实原生 Codex 子 Agent 被记录后进入该状态。
+- `SEQUENTIAL_ROLE_FALLBACK`：仅在原生 spawn 明确不可用、被禁用、不受支持或真实 spawn 失败后使用的单 Agent 保底状态。
 
-Dashboard labels:
+Dashboard 对应显示：
 
 ```text
 原生多 Agent（默认）
@@ -45,9 +49,9 @@ Dashboard labels:
 等待原生 Agent 确认
 ```
 
-## Runtime tools
+## Runtime 工具
 
-The v0.3.0 Runtime exposes 10 tools:
+v0.3.0 Runtime 提供 10 个工具：
 
 - `agent_team_create`
 - `agent_team_get`
@@ -60,83 +64,83 @@ The v0.3.0 Runtime exposes 10 tools:
 - `agent_team_append_event`
 - `agent_team_render_dashboard`
 
-The Runtime is local and has no npm dependencies beyond Node.js itself.
+Runtime 完全在本地运行，除 Node.js 本身外不依赖额外 npm 包。
 
-## Native Codex subagent tracking
+## 原生 Codex 子 Agent 跟踪
 
-A real Codex subagent is tracked separately from the logical team member:
+真实 Codex 子 Agent 与逻辑成员分开记录：
 
 ```text
-Codex display name: Heisenberg
-Logical role:       Architect
-Runtime member:     architect
-Runtime task:       T1
+Codex 显示名： Heisenberg
+逻辑角色：      Architect
+Runtime 成员：  architect
+Runtime 任务：  T1
 ```
 
-After real native delegation succeeds, record it with `agent_team_subagent_started`. When the native agent completes, fails, or is cancelled, record the terminal result with `agent_team_subagent_finished`.
+真实原生委派成功后，Manager 调用 `agent_team_subagent_started` 记录启动；子 Agent 完成、失败或取消后，再调用 `agent_team_subagent_finished` 记录终态。
 
-Ordinary chats, top-level Tasks, `create_thread`, `fork_thread`, `handoff_thread`, or cross-task delegation do not count as native subagents.
+普通聊天、顶层 Task、`create_thread`、`fork_thread`、`handoff_thread` 或 cross-task delegation 都不算原生子 Agent。
 
-Active native subagents are part of completion gating. A linked task cannot be marked done while its native subagent is still running.
+正在运行的原生子 Agent 会参与完成门禁：只要与任务关联的原生子 Agent 仍在运行，该任务就不能被标记为完成。
 
-## Main tasks and dynamic follow-up tasks
+## 主任务与动态后续任务
 
-Tasks present when `agent_team_create` creates the team are treated by the Dashboard as **main tasks**.
+`agent_team_create` 创建团队时已经存在的任务，在 Dashboard 中视为 **主任务**。
 
-Tasks later appended through `agent_team_add_task` are displayed separately as **dynamic follow-up tasks**. Typical examples include:
+之后通过 `agent_team_add_task` 新增的任务会单独显示为 **动态后续任务**，典型包括：
 
 ```text
-bug fix
-review remediation
-regression verification
-re-review
-newly discovered follow-up work
+Bug 修复
+Review 修复
+回归验证
+Re-review
+执行过程中发现的其他后续工作
 ```
 
-This keeps the top-level main-task denominator stable instead of showing progress such as `8/9 → 9/11 → 12/14` as follow-up work is discovered.
+这样顶部主任务总数会保持稳定，不会随着后续工作不断出现 `8/9 → 9/11 → 12/14` 这类分母持续增长的情况。
 
-## Review remediation loop
+## Review 修复闭环
 
-Blocking review findings should append follow-up work rather than rewriting completed history:
+阻塞性的 Review 问题应新增后续任务，而不是改写已经完成的历史任务：
 
 ```text
-Fix review findings
-→ Regression verification
+修复 Review 问题
+→ 回归验证
 → Re-review
 ```
 
-Adding follow-up work can reopen a previously completed team.
+新增后续工作可以让已经进入 completed 的团队重新打开并继续执行。
 
-## Runtime verification
+## Runtime 验证
 
-Run:
+运行：
 
 ```text
 node ./scripts/smoke-test.mjs
 ```
 
-The smoke test verifies:
+Smoke test 会验证：
 
-- fresh workspace behavior;
-- the 10-tool Runtime surface;
-- native-subagent lifecycle tracking;
-- execution-mode switching;
-- linked-task completion gating;
-- dependency scheduling;
-- final member convergence;
-- remediation reopening;
-- Dashboard native-agent state;
-- Dashboard main-task / dynamic-task separation.
+- 新工作区行为；
+- 10 个 Runtime 工具；
+- 原生子 Agent 生命周期记录；
+- 执行模式切换；
+- 关联任务完成门禁；
+- 依赖调度；
+- 最终成员状态收敛；
+- 修复任务重新打开团队；
+- Dashboard 原生 Agent 状态；
+- Dashboard 主任务 / 动态任务分离。
 
-Expected output:
+期望输出：
 
 ```text
 Auto Agent Team runtime smoke test passed.
 ```
 
-## State
+## 状态文件
 
-Team state is written only under the selected workspace:
+团队状态只写入当前选中的工作区：
 
 ```text
 .agent-team/team.json
