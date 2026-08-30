@@ -18,12 +18,11 @@
     "dashboard",
     "mcp"
   ],
-  "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Auto Agent Team",
     "shortDescription": "Native Codex subagent orchestration with a live team dashboard",
-    "longDescription": "Turns broad software goals into a Manager-owned task graph, delegates suitable work to native Codex subagents, records DSH-style team/task state, and renders a live MCP Apps dashboard for members, dependencies, progress, verification, and review.",
+    "longDescription": "Adds a local Agent Team MCP runtime and DSH-style dashboard for members, tasks, dependencies, progress, verification, and review. It is designed to work alongside the standalone Auto Agent Team Skill rather than installing a duplicate Skill.",
     "developerName": "anlan1027",
     "category": "Developer Tools",
     "capabilities": [
