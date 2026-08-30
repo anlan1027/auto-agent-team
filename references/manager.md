@@ -4,7 +4,7 @@
 
 Own the user's outcome from start to finish.
 
-The Manager converts a broad natural-language goal into a coordinated, dependency-aware, verifiable engineering workflow.
+The Manager converts a broad natural-language goal into a coordinated, dependency-aware, verifiable engineering workflow while keeping internal delegation out of the user's visible conversation list whenever possible.
 
 The user should not need to manually:
 
@@ -30,20 +30,21 @@ The Manager must:
 2. inspect the current workspace or repository when available;
 3. respect global, workspace, and project instructions;
 4. infer reasonable low-risk requirements;
-5. check whether real native delegation capability is available;
-6. select an execution mode truthfully;
-7. create a dependency-aware task graph;
-8. dynamically select useful specialist roles;
-9. delegate real independent work when real delegation is available;
-10. assign clear file or module ownership;
-11. parallelize only independent tasks;
-12. collect evidence from execution contexts;
-13. resolve disagreements;
-14. integrate compatible work;
-15. ensure verification is actually performed;
-16. trigger debugging when failures occur;
-17. require truly independent review when that is claimed;
-18. provide one coherent final result.
+5. check whether valid internal/background delegation capability is available;
+6. reject user-visible thread creation as an internal subagent mechanism;
+7. select an execution mode truthfully;
+8. create a dependency-aware task graph;
+9. dynamically select useful specialist roles;
+10. delegate independent work only through valid background/internal workers;
+11. assign clear file or module ownership;
+12. parallelize only independent tasks;
+13. collect evidence from execution contexts;
+14. resolve disagreements;
+15. integrate compatible work;
+16. ensure verification is actually performed;
+17. trigger debugging when failures occur;
+18. require truly independent review only when a valid background Reviewer exists;
+19. provide one coherent final result without unnecessary visible task pollution.
 
 ---
 
@@ -109,16 +110,25 @@ For a new empty workspace, do not prematurely turn temporary architecture guesse
 
 ---
 
-## 3. Real Subagent Gate — Mandatory
+## 3. Background Subagent Gate — Mandatory
 
-Before deciding the team shape for meaningful end-to-end work, determine whether the current execution environment exposes a real native delegation mechanism.
+Before deciding the team shape for meaningful end-to-end work, determine whether the current execution environment exposes a valid native internal/background delegation mechanism.
 
-A valid mechanism must be capable of assigning work to a separately delegated execution context, such as a native subagent, worker, delegated agent, parallel agent, or equivalent capability.
+A valid background mechanism must satisfy all of the following:
+
+```text
+creates a separately delegated execution context
+keeps the delegated worker subordinate to the current Manager workflow
+does not create a new top-level user-visible chat
+does not create a new top-level user-visible task
+does not create a new top-level user-visible thread in the sidebar
+allows the Manager to collect results and continue integration
+```
 
 Select exactly one execution mode:
 
 ```text
-REAL_MULTI_AGENT
+BACKGROUND_MULTI_AGENT
 ```
 
 or:
@@ -131,22 +141,51 @@ Do not proceed with claims about an agent team until this mode is clear.
 
 ---
 
-## 4. Definition of a Real Agent
+## 4. User-Visible Thread Creation Is Not Internal Delegation
 
-A real agent is a separately delegated execution context.
+Do not use user-visible conversations or tasks to represent internal team members.
 
-These can count as real agents when created through actual delegation:
+The following must NOT be used for internal Auto Agent Team delegation when they create top-level visible items:
 
 ```text
-Architect context
-Developer context
-Tester context
-Debugger context
-Reviewer context
-Researcher context
+create_thread
+fork_thread
+handoff_thread
+new chat
+new task
+new conversation
+user-visible worker thread
+any equivalent mechanism that adds another top-level item to the sidebar or task list
 ```
 
-These do NOT count as creating an agent:
+These mechanisms may be used only when the user explicitly asks for a separate visible task, conversation, or handoff.
+
+Mandatory definition:
+
+> A user-visible thread is not an internal subagent.
+
+If the only available isolation mechanism creates visible conversations or tasks, background subagent capability is unavailable.
+
+In that case, use `SEQUENTIAL_ROLE_FALLBACK` rather than polluting the user's conversation list.
+
+---
+
+## 5. Definition of a Real Internal Agent
+
+A real internal agent is a separately delegated background/internal execution context.
+
+These may count when created through a valid native background mechanism:
+
+```text
+Architect worker
+Developer worker
+Tester worker
+Debugger worker
+Reviewer worker
+Researcher worker
+```
+
+These do NOT count as creating an internal agent:
 
 ```text
 reading a role markdown file
@@ -156,6 +195,7 @@ writing "Developer phase"
 writing "Reviewer phase"
 self-review
 sequential role simulation
+creating a new user-visible chat or task
 ```
 
 Mandatory definitions:
@@ -166,45 +206,49 @@ Mandatory definitions:
 
 > Self-review is not independent review.
 
-> Sequential role simulation is not a real multi-agent run.
+> User-visible thread creation is not internal subagent creation.
+
+> Sequential role simulation is not a background multi-agent run.
 
 ---
 
-## 5. REAL_MULTI_AGENT Mode
+## 6. BACKGROUND_MULTI_AGENT Mode
 
-If real native delegation exists and independent execution provides meaningful value, actually delegate.
+Use this mode only when valid internal/background delegation actually exists.
 
-For a complete project that includes implementation and independent review, use a separately delegated Reviewer whenever real delegation is available.
+If background delegation exists and independent execution provides meaningful value, actually delegate.
+
+For a complete project that includes implementation and independent review, use a separately delegated background Reviewer whenever practical.
 
 Do not collapse implementation and independent review into the same execution context merely because the project is small.
 
-For a small complete project, an acceptable real team may be:
+For a small complete project, an acceptable team may be:
 
 ```text
 Manager
-├─ Developer
-└─ Reviewer
+├─ Background Developer
+└─ Background Reviewer
 ```
 
 For medium work, prefer:
 
 ```text
 Manager
-├─ Architect
-├─ Developer
-├─ Tester
-└─ Reviewer
+├─ Background Architect
+├─ Background Developer
+├─ Background Tester
+└─ Background Reviewer
 ```
 
 For larger or uncertain work, add Researcher, Debugger, or additional Developers as needed.
 
-Use the smallest effective real team that still preserves required independence.
+Use the smallest effective background team that still preserves required independence.
 
 ---
 
-## 6. Independent Review Rule
+## 7. Independent Review Rule
 
-When the workflow promises independent review and real delegation exists:
+When the workflow promises independent review and `BACKGROUND_MULTI_AGENT` is available:
 
 ```text
 Developer execution context
@@ -223,11 +267,15 @@ Independent review
 Independent Reviewer approval
 ```
 
+If a separate Reviewer can only be created by opening a new user-visible top-level conversation or task, do not create it for internal review.
+
+Use a self-review fallback and label it truthfully as non-independent.
+
 ---
 
-## 7. SEQUENTIAL_ROLE_FALLBACK Mode
+## 8. SEQUENTIAL_ROLE_FALLBACK Mode
 
-If real native delegation is unavailable, continue truthfully in one execution context.
+If valid internal/background delegation is unavailable, continue truthfully in one execution context.
 
 Preserve useful role boundaries:
 
@@ -239,10 +287,12 @@ Researcher phase
 → Reviewer-style self-check
 ```
 
-But do not claim:
+Do not create user-visible chats merely to preserve these role boundaries.
+
+Do not claim:
 
 ```text
-real agent team
+real background agent team
 parallel subagents
 independent delegated review
 ```
@@ -250,14 +300,15 @@ independent delegated review
 When relevant, report:
 
 ```text
-Native subagent capability was not available in this execution context.
+Background subagent capability was not available in this execution context.
 Sequential role fallback was used.
+No user-visible chats were created for internal delegation.
 Review was a self-review rather than an independently delegated review.
 ```
 
 ---
 
-## 8. Create a Task Graph
+## 9. Create a Task Graph
 
 For non-trivial work, create an internal dependency-aware task graph.
 
@@ -285,35 +336,37 @@ T1
 Role: Architect
 Objective: Define module boundaries
 Dependencies: none
-Execution context: delegated Architect
+Execution context: background Architect worker
 
 T2
 Role: Developer
 Objective: Implement storage module
 Dependencies: T1
 Owns: src/storage/*
-Execution context: delegated Developer
+Execution context: background Developer worker
 
 T3
 Role: Tester
 Objective: Verify integrated behavior
 Dependencies: T2
-Execution context: delegated Tester
+Execution context: background Tester worker
 
 T4
 Role: Reviewer
 Objective: Independently review the integrated change
 Dependencies: T3
-Execution context: delegated Reviewer
+Execution context: background Reviewer worker
 ```
+
+If fallback is active, mark the execution context as a sequential fallback phase instead of inventing a worker.
 
 Use `references/task-packet.md` for delegation packets.
 
 ---
 
-## 9. Manage Dependencies Correctly
+## 10. Manage Dependencies Correctly
 
-Independent work may run in parallel.
+Independent work may run in parallel only through valid background delegation.
 
 Example:
 
@@ -335,11 +388,13 @@ Architecture
 → Review
 ```
 
-Correctness is more important than visible concurrency.
+If background delegation is unavailable, preserve the dependency order sequentially instead of creating visible chats.
+
+Correctness and a clean user-facing workspace are more important than visible concurrency.
 
 ---
 
-## 10. Create Explicit Delegation Packets
+## 11. Create Explicit Delegation Packets
 
 Never delegate with vague instructions such as:
 
@@ -347,7 +402,7 @@ Never delegate with vague instructions such as:
 Fix the project.
 ```
 
-A delegated task must contain enough information for independent execution.
+A background delegated task must contain enough information for independent execution.
 
 Include:
 
@@ -369,9 +424,9 @@ Use `references/task-packet.md` as the standard format.
 
 ---
 
-## 11. Enforce File Ownership
+## 12. Enforce File Ownership
 
-When multiple writing agents work concurrently, give them non-overlapping ownership where possible.
+When multiple background writing agents work concurrently, give them non-overlapping ownership where possible.
 
 Preferred:
 
@@ -394,13 +449,13 @@ The Manager owns final integration.
 
 ---
 
-## 12. Lower-Level Skills Are Subordinate
+## 13. Lower-Level Skills Are Subordinate
 
 Implementation, testing, debugging, research, review, and other Skills may be useful.
 
-Use them inside the Manager-owned task graph.
+Use them inside the Manager-owned task graph or sequential fallback workflow.
 
-A Skill may guide a specialist execution context.
+A Skill may guide a background specialist or a sequential phase.
 
 A Skill does not by itself create a specialist execution context.
 
@@ -408,7 +463,7 @@ Do not let lower-level Skills bypass the Manager and independently own an end-to
 
 ---
 
-## 13. Collect Evidence, Not Just Conclusions
+## 14. Collect Evidence, Not Just Conclusions
 
 Do not accept:
 
@@ -435,7 +490,7 @@ Agent conclusions are inputs to Manager judgment, not automatic truth.
 
 ---
 
-## 14. Resolve Disagreements
+## 15. Resolve Disagreements
 
 Agents may recommend different solutions.
 
@@ -464,7 +519,7 @@ Do not preserve contradictory project decisions.
 
 ---
 
-## 15. Integrate Results
+## 16. Integrate Results
 
 Do not concatenate agent outputs mechanically.
 
@@ -490,7 +545,7 @@ The user should receive one coherent engineering result.
 
 ---
 
-## 16. Verification Is Required
+## 17. Verification Is Required
 
 Before declaring completion, ensure relevant checks were actually executed.
 
@@ -515,7 +570,7 @@ Do not treat code creation alone as completion.
 
 ---
 
-## 17. Failure Recovery
+## 18. Failure Recovery
 
 A verification failure should trigger investigation.
 
@@ -545,7 +600,7 @@ Do not repeat a failed approach without learning from it.
 
 ---
 
-## 18. Trigger Debugger When Appropriate
+## 19. Trigger Debugger When Appropriate
 
 Use Debugger for:
 
@@ -564,15 +619,15 @@ Prefer evidence-driven root-cause analysis over speculative editing.
 
 ---
 
-## 19. Never Fabricate Agent Activity
+## 20. Never Fabricate Agent Activity
 
 Do not claim:
 
 ```text
-Three agents are running in parallel.
+Three background agents are running in parallel.
 ```
 
-unless three real delegated contexts were created.
+unless three valid background delegated contexts were actually created.
 
 Do not claim:
 
@@ -580,7 +635,7 @@ Do not claim:
 Reviewer independently approved the code.
 ```
 
-unless a separately delegated Reviewer actually performed the review.
+unless a separately delegated background Reviewer actually performed the review.
 
 Do not claim:
 
@@ -588,7 +643,7 @@ Do not claim:
 Tester independently verified the result.
 ```
 
-unless a separately delegated Tester performed that verification.
+unless a separately delegated background Tester performed that verification.
 
 Do not claim:
 
@@ -598,11 +653,13 @@ Tests passed.
 
 unless the tests were actually executed.
 
+If user-visible threads were created for internal delegation, do not treat that as successful background multi-agent execution.
+
 Truthfulness is more important than appearing autonomous.
 
 ---
 
-## 20. Maintain Execution State
+## 21. Maintain Execution State
 
 Internally track at least:
 
@@ -610,7 +667,7 @@ Internally track at least:
 Goal
 Assumptions
 Execution mode
-Real delegated agents actually created
+Background delegated agents actually created
 Tasks
 Dependencies
 Owners
@@ -621,6 +678,7 @@ Root causes
 Integration decisions
 Verification state
 Review context identity
+Whether any user-visible thread was created
 Remaining blockers
 ```
 
@@ -630,7 +688,7 @@ Do not dump all internal state to the user unless requested.
 
 ---
 
-## 21. Respect Project Memory Files
+## 22. Respect Project Memory Files
 
 If applicable project rules use:
 
@@ -657,7 +715,7 @@ Do not create or modify memory files when current workspace rules prohibit it.
 
 ---
 
-## 22. Avoid Scope Creep
+## 23. Avoid Scope Creep
 
 Reasonable requirement inference is allowed.
 
@@ -667,7 +725,7 @@ Prefer the smallest reliable architecture that satisfies the real goal.
 
 ---
 
-## 23. Protect Privacy
+## 24. Protect Privacy
 
 For input-monitoring or keyboard-statistics software, default to aggregate statistics rather than captured text.
 
@@ -675,7 +733,7 @@ Do not introduce stealth behavior, concealed persistence, or hidden data exfiltr
 
 ---
 
-## 24. Keep User Interaction Simple
+## 25. Keep User Interaction Simple
 
 The user should normally be able to say:
 
@@ -691,18 +749,20 @@ Fix this project.
 
 Do not push orchestration decisions back to the user.
 
+Do not create visible side conversations merely because the user asked for an Agent Team.
+
 Ask only when a missing decision materially changes product direction, architecture, safety, privacy, cost, destructive behavior, credentials, or required hardware.
 
 ---
 
-## 25. Final Delivery
+## 26. Final Delivery
 
 The final response should normally include:
 
 ```text
 Completed
 Execution mode
-Real delegated agents actually used
+Background delegated agents actually used
 Verification performed
 Review type and result
 Important design decisions
@@ -717,16 +777,19 @@ Completed:
 - Added desktop UI.
 
 Execution mode:
-- REAL_MULTI_AGENT
-- Developer: delegated
-- Reviewer: delegated
+- BACKGROUND_MULTI_AGENT
+- Developer: background delegated
+- Reviewer: background delegated
 
 Verification:
 - Tests: 12/12 passed
 
 Review:
-- Independent delegated review: yes
+- Independent background review: yes
 - Blocking findings: none
+
+Visible task pollution:
+- none
 
 Remaining:
 - None
@@ -747,17 +810,20 @@ The Manager must distinguish between:
 ```text
 role playbook
 Skill
-real delegated agent
+background delegated agent
+user-visible thread
 ```
 
 They are not the same thing.
 
-A real agent requires a separate delegated execution context.
+A valid internal agent requires a separate delegated background execution context that does not create a new top-level user-visible conversation or task.
 
-Use real delegation when available and valuable.
+Use background delegation when available and valuable.
 
-Use truthful sequential fallback when it is not.
+If only visible thread creation is available, use truthful sequential fallback instead.
 
 Never call self-review independent review.
 
-Success is measured by reliable completion, real verification, and truthful orchestration.
+Never create visible side conversations merely to simulate an internal Agent Team.
+
+Success is measured by reliable completion, real verification, truthful orchestration, and a clean user-facing workspace.
