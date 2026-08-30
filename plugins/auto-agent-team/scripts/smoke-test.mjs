@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(__dirname, "..");
 const serverPath = path.join(pluginRoot, "mcp", "server.mjs");
 const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "auto-agent-team-smoke-"));
+const emptyWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "auto-agent-team-empty-"));
 const cycleWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "auto-agent-team-cycle-"));
 const child = spawn(process.execPath, [serverPath], { stdio: ["pipe", "pipe", "inherit"] });
 const lines = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
@@ -44,11 +45,33 @@ function member(state, id) { return state.members.find(item => item.id === id); 
 function assert(condition, message) { if (!condition) throw new Error(message); }
 
 try {
-  const init = await request("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "smoke-test", version: "1.0.0" } });
+  const init = await request("initialize", {
+    protocolVersion: "2025-11-25",
+    capabilities: {},
+    clientInfo: { name: "smoke-test", version: "1.0.0" }
+  });
   assert(init?.serverInfo?.name === "Auto Agent Team Runtime", "Unexpected serverInfo.name");
 
   const list = await request("tools/list");
   assert(Array.isArray(list?.tools) && list.tools.length === 6, "Expected six Agent Team tools");
+
+  // Regression: a fresh workspace must not throw just because the Manager checks or renders before create.
+  const emptyGet = await request("tools/call", {
+    name: "agent_team_get",
+    arguments: { workspacePath: emptyWorkspace }
+  });
+  assert(emptyGet?.structuredContent?.initialized === false, "Fresh get should return initialized=false");
+  assert(emptyGet?.structuredContent?.team === null, "Fresh get should not fabricate persisted team state");
+  assert(!fs.existsSync(path.join(emptyWorkspace, ".agent-team", "team.json")), "Fresh get must not create team.json");
+
+  const emptyRender = await request("tools/call", {
+    name: "agent_team_render_dashboard",
+    arguments: { workspacePath: emptyWorkspace }
+  });
+  assert(emptyRender?.structuredContent?.initialized === false, "Fresh render should report initialized=false");
+  assert(team(emptyRender)?.id === "uninitialized-agent-team", "Fresh render should supply an uninitialized dashboard model");
+  assert(emptyRender?._meta?.ui?.resourceUri === "ui://auto-agent-team/team-dashboard.html", "Fresh render should still attach dashboard UI metadata");
+  assert(!fs.existsSync(path.join(emptyWorkspace, ".agent-team", "team.json")), "Fresh render must not silently persist fake team state");
 
   const create = await request("tools/call", {
     name: "agent_team_create",
@@ -70,40 +93,83 @@ try {
       ]
     }
   });
+
   let state = team(create);
+  assert(create?.structuredContent?.initialized === true, "Created team should report initialized=true");
   assert(state?.name === "smoke-team", "Team creation failed");
   assert(state.schemaVersion === 2, "Expected schemaVersion 2");
   assert(task(state, "t1").status === "ready", "Dependency-free t1 should auto-ready");
   assert(task(state, "t2").status === "pending", "t2 should wait for t1");
   assert(member(state, "researcher").currentTask === "t1", "Researcher should be pointed at ready t1");
 
-  state = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: "t1", status: "running" } }));
+  state = team(await request("tools/call", {
+    name: "agent_team_update_task",
+    arguments: { workspacePath: workspace, taskId: "t1", status: "running" }
+  }));
   assert(state.phase === "running", "Running work should set phase running");
   assert(member(state, "researcher").status === "working", "Researcher should derive working from t1");
 
-  state = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: "t1", status: "done", result: "research complete" } }));
+  state = team(await request("tools/call", {
+    name: "agent_team_update_task",
+    arguments: { workspacePath: workspace, taskId: "t1", status: "done", result: "research complete" }
+  }));
   assert(task(state, "t2").status === "ready", "Completing t1 should unlock t2");
   assert(member(state, "researcher").status === "done", "Researcher should complete when assigned work is done");
 
-  state = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: "t2", status: "failed", result: "simulated failure" } }));
+  state = team(await request("tools/call", {
+    name: "agent_team_update_task",
+    arguments: { workspacePath: workspace, taskId: "t2", status: "failed", result: "simulated failure" }
+  }));
   assert(task(state, "t3").status === "blocked" && task(state, "t4").status === "blocked", "Failure should block downstream tasks");
   assert(state.phase === "blocked", "No runnable recovery work should set phase blocked");
 
-  state = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: "t2", status: "running" } }));
+  state = team(await request("tools/call", {
+    name: "agent_team_update_task",
+    arguments: { workspacePath: workspace, taskId: "t2", status: "running" }
+  }));
   assert(state.phase === "running", "Retrying t2 should return phase to running");
-  state = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: "t2", status: "done", result: "implementation complete", evidence: ["smoke evidence"] } }));
+
+  state = team(await request("tools/call", {
+    name: "agent_team_update_task",
+    arguments: {
+      workspacePath: workspace,
+      taskId: "t2",
+      status: "done",
+      result: "implementation complete",
+      evidence: ["smoke evidence"]
+    }
+  }));
   assert(task(state, "t3").status === "ready" && task(state, "t4").status === "ready", "Recovering t2 should unblock downstream tasks");
 
-  state = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: "t3", status: "running" } }));
+  state = team(await request("tools/call", {
+    name: "agent_team_update_task",
+    arguments: { workspacePath: workspace, taskId: "t3", status: "running" }
+  }));
   assert(state.phase === "verifying", "Verification task should set verifying phase");
-  state = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: "t3", status: "done", result: "tests passed", evidence: ["12/12"] } }));
-  state = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: "t4", status: "running" } }));
+
+  state = team(await request("tools/call", {
+    name: "agent_team_update_task",
+    arguments: { workspacePath: workspace, taskId: "t3", status: "done", result: "tests passed", evidence: ["12/12"] }
+  }));
+
+  state = team(await request("tools/call", {
+    name: "agent_team_update_task",
+    arguments: { workspacePath: workspace, taskId: "t4", status: "running" }
+  }));
   assert(state.phase === "reviewing", "Review task should set reviewing phase");
-  state = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: "t4", status: "done", result: "review passed" } }));
+
+  state = team(await request("tools/call", {
+    name: "agent_team_update_task",
+    arguments: { workspacePath: workspace, taskId: "t4", status: "done", result: "review passed" }
+  }));
   assert(state.phase === "completed", "All tasks done should complete team");
   assert(state.members.every(item => item.status === "done"), "All task-assigned members should be done");
 
-  const render = await request("tools/call", { name: "agent_team_render_dashboard", arguments: { workspacePath: workspace } });
+  const render = await request("tools/call", {
+    name: "agent_team_render_dashboard",
+    arguments: { workspacePath: workspace }
+  });
+  assert(render?.structuredContent?.initialized === true, "Initialized dashboard should report initialized=true");
   assert(render?._meta?.ui?.resourceUri === "ui://auto-agent-team/team-dashboard.html", "Dashboard resource metadata missing");
 
   const resource = await request("resources/read", { uri: "ui://auto-agent-team/team-dashboard.html" });
@@ -138,5 +204,6 @@ try {
   child.stdin.end();
   child.kill();
   fs.rmSync(workspace, { recursive: true, force: true });
+  fs.rmSync(emptyWorkspace, { recursive: true, force: true });
   fs.rmSync(cycleWorkspace, { recursive: true, force: true });
 }
