@@ -170,6 +170,10 @@ Expected tools may include:
 ```text
 agent_team_get
 agent_team_create
+agent_team_set_execution_mode
+agent_team_add_task
+agent_team_subagent_started
+agent_team_subagent_finished
 agent_team_update_member
 agent_team_update_task
 agent_team_append_event
@@ -209,6 +213,39 @@ If `agent_team_get` returns existing state, decide whether it represents the cur
 - Replace it with `agent_team_create` when the workspace is being used for a new unrelated project/run and the old state would be misleading.
 - Never silently carry stale task completion into a new project.
 
+## Native subagent lifecycle synchronization
+
+Whenever a real native Codex subagent is successfully delegated and the lifecycle tools are available, immediately record it:
+
+```text
+agent_team_subagent_started
+```
+
+Pass the Codex display name when known, plus the logical role and mapped Runtime member/task when known.
+
+Example:
+
+```text
+name = Wegener
+role = Reviewer
+memberId = reviewer
+taskId = t4
+```
+
+The Runtime automatically proves `NATIVE_SUBAGENTS` from a real subagent start.
+
+When that subagent returns, fails, or is cancelled, call:
+
+```text
+agent_team_subagent_finished
+```
+
+with the actual terminal status and concise result/evidence.
+
+Do not mark a linked Runtime task `done` before the corresponding native subagent finishes. The lifecycle finish call should normally close the linked task.
+
+Do not wait until the end of the whole project to record all subagent activity after the fact. Record start and finish at the real boundaries so the Dashboard can stay current.
+
 ## Required execution synchronization
 
 At real execution boundaries, keep Runtime state aligned with what actually happened.
@@ -231,28 +268,43 @@ verification passes
 verification fails
 → task = failed or blocked, record evidence, begin recovery
 
-review starts
-→ review task = running
+native Reviewer starts
+→ agent_team_subagent_started
+→ review task becomes running
 
-review completes
-→ review task = done + result
-
-all required work completes
-→ final tasks = done and runtime reaches completed
+native Reviewer completes
+→ agent_team_subagent_finished
+→ review task receives result/evidence
 ```
 
-Use member updates when they represent real native-agent activity or when explicit member status adds truthful information. The Runtime scheduler may derive member state from tasks; do not fight the scheduler with invented statuses.
+Use member updates when they represent real logical-role activity and no more specific native-subagent lifecycle event applies. The Runtime scheduler may derive member state from tasks/native agents; do not fight the scheduler with invented statuses.
+
+## Completion gate
+
+A Runtime-enabled project may reach final `completed` only when:
+
+```text
+all current Runtime tasks are done
+AND
+active native subagents = 0
+```
+
+If a real Codex subagent is still running, the team must remain active even if every logical task was accidentally marked done.
 
 ## Finalization requirement
 
 Before the final answer on a Runtime-enabled project:
 
 ```text
+finish/record all native subagent lifecycle events
+↓
 synchronize final task results
 ↓
 record verification evidence
 ↓
 record review mode/result
+↓
+confirm active native subagents = 0
 ↓
 confirm final Runtime state
 ↓
@@ -267,7 +319,7 @@ The runtime is a status ledger, not a substitute for engineering evidence.
 
 Real files, commands, tests, simulations, and native subagent results remain the source of truth.
 
-Never fabricate task/member completion merely to make the dashboard look finished.
+Never fabricate task/member/subagent completion merely to make the dashboard look finished.
 
 The runtime records state under:
 
@@ -464,6 +516,8 @@ Review mode: self-review fallback
 rather than claiming independent approval.
 
 When Runtime is active, record the actual review mode/result truthfully. A logical Reviewer role in the dashboard does not prove an independent subagent existed.
+
+If a real Reviewer subagent exists, preserve its Codex display name separately from its logical role.
 
 ---
 
