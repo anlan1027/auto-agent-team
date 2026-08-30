@@ -1,7 +1,7 @@
 {
   "name": "auto-agent-team",
-  "version": "0.3.0-dev.4",
-  "description": "Coordinate real native Codex subagents with a two-gate runtime and live team dashboard.",
+  "version": "0.3.0-dev.3",
+  "description": "Coordinate native Codex subagents and show DSH-style team state, tasks, dependencies, verification, and review in a live dashboard.",
   "author": {
     "name": "anlan1027",
     "url": "https://github.com/anlan1027"
@@ -21,8 +21,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Auto Agent Team",
-    "shortDescription": "Real native Codex multi-agent orchestration with two hard gates",
-    "longDescription": "Adds a local Agent Team MCP runtime and live dashboard. Runtime startup is the first gate; a successful native Codex subagent delegation is the second gate before substantive execution. Emergency single-context fallback is clearly marked as Agent Team not established.",
+    "shortDescription": "Native Codex subagent orchestration with a live team dashboard",
+    "longDescription": "Adds a local Agent Team MCP runtime and DSH-style dashboard for members, native Codex subagents, tasks, dependencies, progress, verification, and review. It is designed to work alongside the standalone Auto Agent Team Skill rather than installing a duplicate Skill.",
     "developerName": "anlan1027",
     "category": "Developer Tools",
     "capabilities": [
@@ -32,8 +32,8 @@
     ],
     "websiteURL": "https://github.com/anlan1027/auto-agent-team",
     "defaultPrompt": [
-      "Build this project with Auto Agent Team using real native Codex subagents and show the team dashboard.",
-      "Establish the native Agent Team before implementation, then delegate, verify, and independently review.",
+      "Build this project with Auto Agent Team and show the team dashboard.",
+      "Split this work across native Codex subagents, verify it, and review it.",
       "Open the Auto Agent Team dashboard for this workspace."
     ],
     "brandColor": "#2563EB",
