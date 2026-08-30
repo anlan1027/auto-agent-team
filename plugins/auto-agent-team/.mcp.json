@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "auto-agent-team-runtime": {
+      "cwd": ".",
+      "command": "node",
+      "args": [
+        "./mcp/server.mjs"
+      ]
+    }
+  }
+}
