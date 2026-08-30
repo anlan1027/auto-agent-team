@@ -4,9 +4,11 @@
 
 Own the user's outcome from start to finish.
 
-Use native Codex subagents for real delegation when the host exposes them, keep lower-level skills subordinate, and keep Auto Agent Team Runtime synchronized with reality.
+Use native Codex subagents as the default delegation path when the host exposes them, keep lower-level skills subordinate, and keep Auto Agent Team Runtime synchronized with reality.
 
 Do not replace Codex's native subagent workflow with ordinary tasks, chats, or cross-task delegation.
+
+Sequential single-context execution is backup only after concrete native-spawn failure/unavailability evidence.
 
 ---
 
@@ -88,11 +90,15 @@ Debugger → failure investigation
 Reviewer → independent final review
 ```
 
-When native subagents are available, use them for genuinely useful independent work. Preserve Codex's normal native delegation behavior instead of adding artificial pre-spawn steps.
+For a normal complete project, **native subagents are the default execution path for suitable independent work**.
+
+After Runtime startup, prefer real native delegation for independent research, architecture, implementation, testing, debugging, and review. Use multiple native agents when they add real value. Preserve Codex's normal native delegation behavior instead of adding artificial pre-spawn steps.
 
 The Manager may handle planning, coordination, integration, and tightly coupled work directly.
 
 For independent work, parallelize when safe and give concurrent writers non-overlapping ownership where possible.
+
+Do not downgrade to single-context execution simply because it is easier or because the native spawn capability is not immediately obvious.
 
 ---
 
@@ -102,18 +108,37 @@ Use modes as evidence states:
 
 ```text
 UNKNOWN
-= native capability not yet proven
+= startup / native capability not yet proven
 
 NATIVE_SUBAGENTS
 = at least one real native Codex subagent successfully spawned
+= default successful execution path
 
 SEQUENTIAL_ROLE_FALLBACK
-= real native delegation is unavailable/unsupported or a real native spawn failed
+= emergency single-Agent backup only
+= real native delegation is unavailable/unsupported/disabled or a real native spawn failed
 ```
 
 Do not set `NATIVE_SUBAGENTS` because an ordinary task/thread was created.
 
-Do not choose fallback merely because planning happened in the Manager context.
+Do not choose fallback merely because:
+
+```text
+planning happened in the Manager context
+no native agent is visible yet
+no tool is literally named background_agent
+spawn_agent is not visibly listed in the current surface
+executionMode is still UNKNOWN
+```
+
+Before fallback, require concrete evidence of native unavailability/failure and record the actual reason.
+
+Default policy:
+
+```text
+Prefer: NATIVE_SUBAGENTS via real native spawn
+Use only as backup: SEQUENTIAL_ROLE_FALLBACK
+```
 
 ---
 
@@ -232,7 +257,7 @@ Runtime state matches reality
 ```
 
 If native agents were used, report the actual native agents and `NATIVE_SUBAGENTS`.
-If only fallback occurred, say so truthfully and do not call it successful native Agent Team collaboration.
+If backup execution was required, say so truthfully and do not call it successful native Agent Team collaboration.
 
 ---
 
