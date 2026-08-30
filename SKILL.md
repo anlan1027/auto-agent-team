@@ -1,6 +1,6 @@
 ---
 name: auto-agent-team
-description: Top-level multi-agent orchestrator for end-to-end software engineering work. Prefer this skill for complete projects, applications, substantial features, complex repairs, project completion, self-directed requirement analysis, automatic task decomposition, implementation plus testing, debugging, independent review, explicit agent-team requests, subagent requests, or useful parallel work. When this skill applies, it should own the request above narrower implementation, testing, debugging, research, or review skills. Before deciding the team shape, it must check whether the current environment exposes real native subagent or delegation capability. If real delegation is available, use separately delegated execution contexts for work that benefits from independence, especially independent review. Loading a role prompt, switching skills, or performing self-review does not count as creating an agent. If real delegation is unavailable, fall back truthfully to sequential role execution and clearly avoid calling that fallback a real multi-agent run. Do not use this skill for trivial explanations, isolated snippets, tiny edits, or single-step questions where orchestration adds no value.
+description: Top-level multi-agent orchestrator for end-to-end software engineering work. Prefer this skill for complete projects, substantial features, complex repairs, self-directed requirement analysis, automatic task decomposition, implementation plus testing, debugging, independent review, explicit agent-team requests, subagent requests, or useful parallel work. When this skill applies, it should own the request above narrower implementation, testing, debugging, research, or review skills. Before choosing a team, it must check whether the environment exposes a native internal/background subagent mechanism that can delegate work without creating new top-level user-visible chats, tasks, or threads. User-visible thread creation such as create_thread, fork_thread, handoff_thread, new-chat creation, or equivalent visible task creation must not be used to simulate internal agents. If only user-visible thread isolation is available, treat background subagents as unavailable and use truthful sequential fallback. Loading role prompts, switching skills, or self-review does not count as agent creation. Do not use this skill for trivial explanations, isolated snippets, tiny edits, or single-step questions where orchestration adds no value.
 ---
 
 # Auto Agent Team
@@ -58,11 +58,11 @@ Auto Agent Team
 ↓
 Manager
 ↓
-Real Subagent Gate
+Background Subagent Gate
 ↓
 Task Graph
 ↓
-Specialized Agents / Lower-Level Skills
+Background Specialists or Sequential Fallback
 ↓
 Integration
 ↓
@@ -77,16 +77,25 @@ Do not let a narrower implementation or review skill independently take over the
 
 ---
 
-# 2. Real Subagent Gate — Mandatory
+# 2. Background Subagent Gate — Mandatory
 
-Before deciding how the team will execute a meaningful end-to-end project, determine whether the current environment exposes real native delegation capability.
+Before deciding how a meaningful end-to-end project will execute, determine whether the current environment exposes a real native internal/background delegation capability.
 
-Look for an actual capability that can create or delegate work to a separate execution context, such as a native subagent, worker, delegated agent, parallel agent, or equivalent mechanism exposed by the current environment.
+A valid background subagent mechanism must satisfy all of the following:
+
+```text
+creates a separately delegated execution context
+keeps the worker subordinate to the current Manager workflow
+does not create a new top-level user-visible chat
+does not create a new top-level user-visible task
+does not create a new top-level user-visible thread in the sidebar
+allows the Manager to collect the result and continue integration
+```
 
 The Manager must classify execution into exactly one of these modes:
 
 ```text
-REAL_MULTI_AGENT
+BACKGROUND_MULTI_AGENT
 ```
 
 or:
@@ -99,20 +108,49 @@ Do this before claiming that an agent team is running.
 
 ---
 
-# 3. What Counts as a Real Agent
+# 3. User-Visible Threads Are Not Internal Subagents
 
-A real agent requires a separately delegated execution context.
+Do not use user-visible conversation or task creation to simulate internal team members.
 
-The following DO count when backed by an actual native delegation mechanism:
+The following mechanisms must NOT be used for internal Auto Agent Team delegation when they create top-level user-visible conversations or tasks:
 
 ```text
-Manager delegates architecture analysis to a separate Architect context.
-Manager delegates implementation to a separate Developer context.
-Manager delegates testing to a separate Tester context.
-Manager delegates review to a separate Reviewer context.
+create_thread
+fork_thread
+handoff_thread
+new chat
+new task
+new conversation
+user-visible worker thread
+any equivalent mechanism that adds a separate top-level item to the user's sidebar or task list
 ```
 
-The following DO NOT count as creating an agent:
+These mechanisms may be used only when the user explicitly asks for a separate visible Codex task, conversation, or handoff.
+
+Critical rule:
+
+> A separate visible conversation is not an internal subagent.
+
+If the only available isolation mechanism creates user-visible chats or tasks, classify background subagent capability as unavailable and use `SEQUENTIAL_ROLE_FALLBACK`.
+
+Do not pollute the user's conversation list merely to make the workflow look multi-agent.
+
+---
+
+# 4. What Counts as a Real Internal Agent
+
+A real internal agent requires a separately delegated background/internal execution context.
+
+The following may count when backed by a valid native background delegation mechanism:
+
+```text
+Manager delegates architecture analysis to an internal Architect worker.
+Manager delegates implementation to an internal Developer worker.
+Manager delegates testing to an internal Tester worker.
+Manager delegates review to an internal Reviewer worker.
+```
+
+The following do NOT count as creating an agent:
 
 ```text
 reading references/architect.md
@@ -125,6 +163,7 @@ writing "Architect phase"
 writing "Reviewer phase"
 self-review
 sequential role simulation inside one execution context
+creating a new user-visible chat or task
 ```
 
 Critical definitions:
@@ -135,57 +174,59 @@ Critical definitions:
 
 > Self-review is not independent review.
 
-> Sequential role simulation is not real multi-agent execution.
+> User-visible thread creation is not internal subagent creation.
+
+> Sequential role simulation is not background multi-agent execution.
 
 ---
 
-# 4. REAL_MULTI_AGENT Mode
+# 5. BACKGROUND_MULTI_AGENT Mode
 
-If native delegation is available and the task meaningfully benefits from independent execution, actually delegate.
+Use this mode only when a valid internal/background delegation mechanism is actually available.
 
-For a complete project that includes implementation and independent review, a separately delegated Reviewer should be used whenever native delegation is available.
+If background delegation exists and independent execution provides meaningful value, actually delegate.
+
+For a complete project that includes implementation and independent review, use a separately delegated background Reviewer whenever practical.
 
 Do not collapse implementation and independent review into the same execution context merely because the project is small.
 
-For non-trivial end-to-end projects, prefer a real team such as:
+For a small complete application, an acceptable minimum may be:
 
 ```text
 Manager
-├─ Architect
-├─ Developer
-├─ Tester
-└─ Reviewer
+├─ Background Developer
+└─ Background Reviewer
 ```
 
-Use fewer or more specialists when justified, but preserve genuine independence where it matters.
-
-For a small complete application, an acceptable minimum real team may be:
+For medium work, prefer:
 
 ```text
 Manager
-├─ Developer
-└─ Reviewer
+├─ Background Architect
+├─ Background Developer
+├─ Background Tester
+└─ Background Reviewer
 ```
 
-with testing performed by the Developer or Manager when a separate Tester would add little value.
+For larger or uncertain work, add Researcher, Debugger, or additional Developers as justified.
 
-For medium or larger work, prefer a separate Tester as well.
+Use the smallest effective background team that still preserves required independence.
 
 ---
 
-# 5. Independent Review Requirement
+# 6. Independent Review Requirement
 
-If the requested workflow includes independent review and real delegation exists:
+If the workflow includes independent review and `BACKGROUND_MULTI_AGENT` is available:
 
 ```text
 Developer execution context
-≠
+!=
 Reviewer execution context
 ```
 
-The Reviewer must receive the integrated change as input and independently inspect it.
+The Reviewer must inspect the integrated change independently.
 
-A main agent that wrote the implementation may perform an additional self-check, but that self-check must never be reported as the independent review.
+The implementation context may perform an additional self-check, but that self-check must never be reported as the independent review.
 
 Never report:
 
@@ -195,11 +236,13 @@ Independent review: passed
 
 when the only review was performed by the same execution context that authored the code.
 
+If a background Reviewer cannot be created without producing a new user-visible top-level chat or task, do not create that visible conversation. Use a self-review fallback and report it truthfully as non-independent.
+
 ---
 
-# 6. SEQUENTIAL_ROLE_FALLBACK Mode
+# 7. SEQUENTIAL_ROLE_FALLBACK Mode
 
-If no real native delegation capability is available, continue the engineering workflow sequentially rather than failing the project.
+If no valid internal/background delegation capability is available, continue the engineering workflow sequentially rather than failing the project.
 
 Use role boundaries such as:
 
@@ -215,23 +258,26 @@ Tester phase
 Reviewer-style self-check
 ```
 
-But remain truthful.
+Remain truthful.
 
 Do not call this a real multi-agent run.
 
-Do not claim that independent review occurred.
+Do not claim parallel subagents were created.
 
-When relevant to the final result, state clearly:
+Do not claim independent review occurred.
+
+When relevant, state:
 
 ```text
-Native subagent capability was not available in this execution context.
+Background subagent capability was not available in this execution context.
 Sequential role fallback was used.
+No user-visible chats were created for internal delegation.
 Review was a self-review, not an independent delegated review.
 ```
 
 ---
 
-# 7. Lower-Level Skills Are Execution Capabilities
+# 8. Lower-Level Skills Are Execution Capabilities
 
 Other Skills may be useful for:
 
@@ -257,9 +303,9 @@ Auto Agent Team
 ↓
 Manager
 ↓
-Delegated task
+Background delegated task or sequential phase
 ↓
-Specialist agent and/or lower-level Skill
+Specialist role and/or lower-level Skill
 ```
 
 Not:
@@ -272,11 +318,11 @@ Implement Skill owns entire project
 Review Skill owns entire project
 ```
 
-A lower-level Skill can guide a delegated agent, but loading that Skill alone does not create that agent.
+A lower-level Skill can guide a worker or phase, but loading that Skill alone does not create an agent.
 
 ---
 
-# 8. Respect Global and Workspace Rules
+# 9. Respect Global and Workspace Rules
 
 Auto Agent Team does not replace higher-priority user, global, workspace, or project rules.
 
@@ -295,11 +341,11 @@ Then continue with Auto Agent Team orchestration.
 
 Do not create project-memory files when global rules say no local workspace exists.
 
-Do not let an empty-workspace initialization prematurely lock in unreviewed architecture decisions.
+Do not let empty-workspace initialization prematurely lock in unreviewed architecture decisions.
 
 ---
 
-# 9. Invocation Intent
+# 10. Invocation Intent
 
 Strong end-to-end signals include:
 
@@ -328,7 +374,7 @@ Natural-language project intent is enough.
 
 ---
 
-# 10. When Not to Take Over
+# 11. When Not to Take Over
 
 Do not use full orchestration for small atomic tasks such as:
 
@@ -346,7 +392,7 @@ General rule:
 
 ---
 
-# 11. Manager Owns the Workflow
+# 12. Manager Owns the Workflow
 
 When Auto Agent Team is active, read and apply:
 
@@ -360,7 +406,7 @@ The Manager owns:
 goal interpretation
 requirement inference
 project inspection
-real-subagent capability check
+background-subagent capability check
 execution-mode selection
 task decomposition
 dependency analysis
@@ -377,7 +423,7 @@ final delivery
 
 ---
 
-# 12. Build a Dependency-Aware Task Graph
+# 13. Build a Dependency-Aware Task Graph
 
 For meaningful work, create an internal task graph before large implementation begins.
 
@@ -405,17 +451,19 @@ references/task-packet.md
 
 for delegation structure.
 
-The `Execution context` should indicate whether the task is:
+The `Execution context` should indicate one of:
 
 ```text
 main-manager
-real delegated agent
+background delegated worker
 sequential fallback phase
 ```
 
+Never use a user-visible chat title as an execution-context substitute for an internal worker.
+
 ---
 
-# 13. Select Roles Dynamically
+# 14. Select Roles Dynamically
 
 Available playbooks:
 
@@ -444,19 +492,19 @@ Reviewer
 
 Do not activate every role automatically.
 
-Choose the smallest effective team that still preserves required independence.
+Choose the smallest effective team that still preserves required independence when valid background delegation exists.
 
-Revised governing rule:
+Governing rule:
 
-> Use the smallest effective team, but never reduce required independent review to self-review when real delegation is available.
+> Use the smallest effective team, but never create user-visible conversations merely to satisfy an internal role boundary.
 
 ---
 
-# 14. Parallelism
+# 15. Parallelism
 
-Parallelize only independent work.
+Parallelize only independent work and only through valid background delegation.
 
-Good:
+Good when background workers are available:
 
 ```text
 Researcher A → inspect repository
@@ -472,21 +520,15 @@ Developer B → src/storage/*
 Developer C → src/ui/*
 ```
 
-Bad:
+If no valid background delegation exists, preserve dependency order sequentially instead of creating visible chats.
 
-```text
-Architect still defines an interface
-while
-Developer implements against an unknown interface
-```
-
-Correct dependencies are more important than visible parallelism.
+Correct dependencies and clean user experience are more important than visible parallelism.
 
 ---
 
-# 15. File Ownership
+# 16. File Ownership
 
-When multiple writing agents operate concurrently, assign non-overlapping ownership.
+When multiple background writing agents operate concurrently, assign non-overlapping ownership.
 
 Preferred:
 
@@ -502,7 +544,7 @@ The Manager owns final integration.
 
 ---
 
-# 16. Specialist Playbooks
+# 17. Specialist Playbooks
 
 Use the appropriate role playbook when a role is selected:
 
@@ -521,7 +563,7 @@ They do not themselves create an execution context.
 
 ---
 
-# 17. Failure Recovery
+# 18. Failure Recovery
 
 A failed verification should trigger investigation:
 
@@ -549,7 +591,7 @@ Do not repeatedly retry the same failed approach without learning from it.
 
 ---
 
-# 18. Verification Gate
+# 19. Verification Gate
 
 Do not declare completion without relevant evidence.
 
@@ -572,36 +614,39 @@ Do not claim a check passed unless it was actually executed.
 
 ---
 
-# 19. Truthfulness Gate
+# 20. Truthfulness Gate
 
 Never fabricate orchestration activity.
 
 Do not claim:
 
 ```text
-three agents are running
+background agents are running
 parallel agents were created
 independent Reviewer approved the code
 Tester independently verified the result
 ```
 
-unless those things actually occurred through separate delegated execution contexts.
+unless those things actually occurred through valid background delegated execution contexts.
 
 Maintain an internal execution record containing at least:
 
 ```text
 Execution mode
-Delegated agents actually created
-Tasks assigned to each real agent
+Background agents actually created
+Tasks assigned to each background agent
 Tasks executed in the main context
 Tests actually run
 Review context identity
+Whether any user-visible thread was created
 Remaining limitations
 ```
 
+If any user-visible thread was created for internal delegation, treat that as a workflow mistake rather than evidence of successful background multi-agent execution.
+
 ---
 
-# 20. Requirement Inference
+# 21. Requirement Inference
 
 For broad requests, infer sensible conventional requirements.
 
@@ -629,7 +674,7 @@ Do not automatically add unrelated product scope such as cloud accounts, billing
 
 ---
 
-# 21. Do Not Push Orchestration Back to the User
+# 22. Do Not Push Orchestration Back to the User
 
 Do not ask the user to choose:
 
@@ -647,7 +692,7 @@ Ask only when a missing decision materially affects product direction, safety, p
 
 ---
 
-# 22. Final Delivery
+# 23. Final Delivery
 
 Preferred final structure:
 
@@ -656,16 +701,19 @@ Completed:
 - ...
 
 Execution mode:
-- REAL_MULTI_AGENT or SEQUENTIAL_ROLE_FALLBACK
-- Real delegated agents: ...
+- BACKGROUND_MULTI_AGENT or SEQUENTIAL_ROLE_FALLBACK
+- Background delegated agents: ...
 
 Verification:
 - Build: ...
 - Tests: ...
 
 Review:
-- Independent delegated review: yes/no
+- Independent background review: yes/no
 - Result: ...
+
+User-visible task pollution:
+- none expected for internal delegation
 
 Important decisions:
 - ...
@@ -678,7 +726,7 @@ Do not expose every internal prompt or transcript unless the user asks.
 
 ---
 
-# 23. Success Criteria
+# 24. Success Criteria
 
 Success means:
 
@@ -689,13 +737,15 @@ Auto Agent Team selected when appropriate
 ↓
 Manager owns workflow
 ↓
-real-subagent capability checked
+background-subagent capability checked
 ↓
 execution mode truthfully selected
 ↓
 task graph built
 ↓
-real delegation used when available and valuable
+background delegation used when genuinely available
+↓
+no unnecessary user-visible chats created for internal roles
 ↓
 independent review truly independent when claimed
 ↓
@@ -710,7 +760,7 @@ one coherent result delivered
 
 Success is not measured by agent count.
 
-Success is measured by reliable completion plus truthful orchestration.
+Success is measured by reliable completion, truthful orchestration, and a clean user-facing workspace.
 
 ---
 
@@ -722,7 +772,7 @@ Role files are playbooks.
 
 Skills are capabilities.
 
-A real agent is a separately delegated execution context.
+A real internal agent is a separately delegated background execution context that does not create a new top-level user-visible conversation or task.
 
 The intended hierarchy is:
 
@@ -735,11 +785,11 @@ Auto Agent Team
 ↓
 Manager
 ↓
-Real Subagent Gate
-├─ REAL_MULTI_AGENT
-│  └─ Real delegated specialist contexts
+Background Subagent Gate
+├─ BACKGROUND_MULTI_AGENT
+│  └─ Internal background specialist contexts
 └─ SEQUENTIAL_ROLE_FALLBACK
-   └─ Truthful sequential role execution
+   └─ Truthful sequential role execution in the main conversation
 ↓
 Integration
 ↓
