@@ -1,5 +1,9 @@
 # Auto Agent Team
 
+<p align="center">
+  中文 | <a href="README_EN.md">English</a>
+</p>
+
 一个面向 OpenAI Codex 的自动多 Agent 工程编排项目。
 
 用户只需要描述目标，Auto Agent Team 负责分析需求、拆分任务、选择角色、调用 Codex 原生 Subagent、协调并行工作、整合代码、测试、调试和独立审查。
@@ -335,6 +339,7 @@ $auto-agent-team 帮我完成这个项目，自己分析、拆任务、调用合
 ```text
 auto-agent-team/
 ├── README.md
+├── README_EN.md
 ├── LICENSE
 ├── SKILL.md
 ├── install-plugin.ps1
