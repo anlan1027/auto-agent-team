@@ -1,6 +1,7 @@
 interface:
   display_name: "Auto Agent Team"
-  short_description: "Turn broad coding goals into coordinated agent work"
-  default_prompt: "Use $auto-agent-team to turn my high-level software goal into a coordinated, verified implementation."
+  short_description: "Top-level orchestrator for complete software projects"
+  default_prompt: "Use $auto-agent-team as the top-level orchestrator for this end-to-end software engineering task. Infer reasonable requirements, inspect the workspace, decompose the work, choose and coordinate specialized agents, parallelize independent tasks when real subagents are available, integrate results, run verification, debug failures, and perform independent review. Treat implementation, testing, debugging, research, and review capabilities as lower-level execution tools rather than letting them independently take over the whole project."
+
 policy:
   allow_implicit_invocation: true
