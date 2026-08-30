@@ -107,7 +107,9 @@ try {
 
   const resource = await request("resources/read", { uri: "ui://auto-agent-team/team-dashboard.html" });
   const html = resource?.contents?.[0]?.text || "";
-  assert(html.includes("原生子智能体") && html.includes("仍有 ${activeNative.length} 个原生子智能体运行中"), "dashboard should expose native subagent state");
+  assert(html.includes("Agent Team 已建立"), "dashboard should show established native Agent Team state");
+  assert(html.includes("Agent Team 未建立"), "dashboard should distinguish emergency fallback from a successful Agent Team");
+  assert(html.includes("仍有 ${active.length} 个原生子智能体运行中"), "dashboard should expose active native subagent state");
 
   console.log("Auto Agent Team runtime smoke test passed.");
 } finally {
