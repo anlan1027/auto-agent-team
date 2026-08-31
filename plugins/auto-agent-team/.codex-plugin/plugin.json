@@ -1,6 +1,6 @@
 {
   "name": "auto-agent-team",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Coordinate native Codex subagents by default and show DSH-style team state, fixed main tasks, dynamic follow-up work, verification, review, and backup execution in a live dashboard.",
   "author": {
     "name": "anlan1027",
@@ -22,7 +22,7 @@
   "interface": {
     "displayName": "Auto Agent Team",
     "shortDescription": "Native Codex agents by default with a live team dashboard",
-    "longDescription": "Adds a local Agent Team MCP runtime and DSH-style dashboard for members, native Codex subagents, fixed main-task progress, dynamic follow-up tasks, dependencies, verification, and review. Native Codex subagents are the default execution path for suitable independent work; sequential single-context execution is backup only after concrete native-spawn unavailability or failure.",
+    "longDescription": "Adds a local Agent Team MCP runtime and DSH-style dashboard for members, native Codex subagents, persisted main/dynamic task classes, dependencies, verification, review, and explicit backup reasons. Native Codex subagents are the default execution path for suitable independent work; once a real native subagent is recorded, native mode remains sticky for that team run.",
     "developerName": "anlan1027",
     "category": "Developer Tools",
     "capabilities": [
