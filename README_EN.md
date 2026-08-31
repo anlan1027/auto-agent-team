@@ -6,7 +6,7 @@
 
 An automatic multi-agent engineering orchestrator for OpenAI Codex.
 
-**v0.3.0** focuses on a simple model: the user describes a project goal, the Manager analyzes requirements, builds the task graph, uses real native Codex subagents by default for suitable independent work, and keeps members, tasks, dependencies, native-agent lifecycle, verification, and review visible through the local Runtime and Dashboard.
+**v0.3.1** focuses on a simple model: the user describes a project goal, the Manager analyzes requirements, builds the task graph, uses real native Codex subagents by default for suitable independent work, and keeps members, tasks, dependencies, native-agent lifecycle, verification, and review visible through the local Runtime and Dashboard.
 
 ---
 
@@ -79,7 +79,15 @@ The Dashboard presents that state as:
 Single-Agent Backup
 ```
 
-It is not the default Agent Team mode.
+It is not the default Agent Team mode. Entering backup mode now requires a concrete reason, and the Dashboard displays that reason explicitly.
+
+Once at least one real native subagent has been successfully recorded for the current team run, execution mode is locked to:
+
+```text
+NATIVE_SUBAGENTS
+```
+
+Even if there are temporarily `0` active native agents between phases, the run cannot be downgraded back to `UNKNOWN` or single-Agent backup.
 
 ---
 
@@ -111,6 +119,7 @@ The Dashboard can show:
 
 - phase: Plan → Execute → Verify → Review → Complete;
 - native multi-agent vs single-agent backup execution;
+- the concrete reason for backup mode;
 - logical members and current status;
 - active and recorded native agents;
 - native display name, logical role, task, result, and evidence;
@@ -123,13 +132,25 @@ The Dashboard can show:
 
 ### Main Tasks and Dynamic Follow-up Tasks
 
-Tasks created with the initial team are treated as **main tasks**. The top-level progress remains stable, for example:
+Tasks created with the initial team are persisted as **main tasks**:
+
+```text
+taskClass: main
+```
+
+Bug fixes, regression tests, review fixes, re-review work, and other items later added with `agent_team_add_task` are persisted as **dynamic follow-up tasks**:
+
+```text
+taskClass: dynamic
+```
+
+The top-level progress remains stable, for example:
 
 ```text
 Main tasks 8/9
 ```
 
-Bug fixes, regression tests, review fixes, re-review work, and other items later added with `agent_team_add_task` are displayed separately as **dynamic follow-up tasks**, so the main-task denominator does not keep growing.
+Dynamic tasks are displayed separately, so the main-task denominator does not keep growing. Existing schema v4 state remains compatible by deriving legacy dynamic tasks from recorded `task_added` events under the schema v5 semantics.
 
 ---
 
@@ -156,7 +177,7 @@ task: T1
 status: running → done
 ```
 
-The Runtime treats real native-agent start as evidence for `NATIVE_SUBAGENTS` and prevents linked tasks from being completed while a native agent is still active.
+The Runtime treats real native-agent start as evidence for `NATIVE_SUBAGENTS` and prevents linked tasks from being completed while a native agent is still active. Starting with v0.3.1, once a real native agent has been recorded, the current team run cannot be manually downgraded to backup mode.
 
 ---
 
@@ -293,6 +314,7 @@ auto-agent-team/
     ├── .codex-plugin/plugin.json
     ├── .mcp.json
     ├── README.md
+    ├── README_EN.md
     ├── mcp/server.mjs
     ├── scripts/smoke-test.mjs
     └── ui/team-dashboard.html
@@ -303,19 +325,18 @@ auto-agent-team/
 # Current Version
 
 ```text
-v0.3.0
+v0.3.1
 ```
 
-v0.3.0 focuses on:
+v0.3.1 hardens the v0.3.0 stable line with:
 
 ```text
-project-scale implicit triggering
-→ Runtime startup
-→ native Agent Team as the default execution path
-→ truthful native-agent lifecycle tracking
-→ dependencies / parallelism / verification / review
-→ fixed main-task progress + dynamic follow-up tasks
-→ single-Agent execution only as backup after real native failure
+persisted main / dynamic task classes
+→ schema v5
+→ backup mode requires a concrete reason
+→ Dashboard displays that backup reason
+→ NATIVE_SUBAGENTS becomes non-downgradable after a real native agent is recorded
+→ smoke tests cover these state-truthfulness rules
 ```
 
 See `CHANGELOG.md` for release notes.
