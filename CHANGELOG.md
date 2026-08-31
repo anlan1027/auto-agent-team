@@ -2,6 +2,54 @@
 
 All notable project changes are summarized here.
 
+## v0.3.1 — 2026-08-31
+
+State-truthfulness and dashboard-stability hardening on top of the v0.3.0 stable line.
+
+### Added
+
+- Runtime task classification with schema v5:
+  - initial team tasks persist as `taskClass: main`;
+  - later follow-up tasks persist as `taskClass: dynamic`.
+- Backward-compatible recovery of legacy dynamic tasks from existing `task_added` events.
+- Persisted `fallbackReason` for single-Agent backup mode.
+- Dashboard display of the concrete backup reason.
+- Smoke-test coverage for task classes, backup-reason enforcement, and sticky native execution mode.
+
+### Changed
+
+- `SEQUENTIAL_ROLE_FALLBACK` now requires a non-empty concrete reason before the Runtime accepts the transition.
+- Directly setting `NATIVE_SUBAGENTS` without a tracked real native subagent is rejected; a real native start must be recorded with `agent_team_subagent_started`.
+- Once any real native subagent has been recorded for a team run, `NATIVE_SUBAGENTS` becomes sticky and cannot be downgraded to `UNKNOWN` or `SEQUENTIAL_ROLE_FALLBACK`, even when the current active-native count is zero.
+- `agent_team_add_task` now always creates a persisted dynamic task rather than relying only on event-log inference.
+- Dashboard main/dynamic task grouping now prefers persisted `taskClass` and keeps event-based inference only as compatibility fallback.
+- Plugin, Runtime, smoke test, and bilingual README documentation are synchronized on `0.3.1`.
+
+### Verification
+
+The bundled smoke test now covers:
+
+```text
+schema v5
+main task classification
+dynamic task classification
+fallback reason required
+fallback reason persistence
+direct false-native mode rejection
+native lifecycle tracking
+linked-task completion gating
+native mode remains sticky after active count returns to zero
+native-to-backup downgrade rejection
+fixed main-task denominator
+Dashboard backup-reason display
+```
+
+Expected result:
+
+```text
+Auto Agent Team runtime smoke test passed.
+```
+
 ## v0.3.0 — 2026-08-30
 
 First stable release of the current native-Agent-Team runtime/dashboard line.
