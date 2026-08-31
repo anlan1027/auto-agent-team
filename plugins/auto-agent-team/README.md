@@ -4,7 +4,7 @@
   中文 | <a href="README_EN.md">English</a>
 </p>
 
-当前稳定版本：**v0.3.0**。
+当前稳定版本：**v0.3.1**。
 
 这个目录包含 Auto Agent Team 的可选 Codex Plugin 层。
 
@@ -41,6 +41,10 @@ SEQUENTIAL_ROLE_FALLBACK
 - `NATIVE_SUBAGENTS`：默认成功路径；至少一个真实原生 Codex 子 Agent 被记录后进入该状态。
 - `SEQUENTIAL_ROLE_FALLBACK`：仅在原生 spawn 明确不可用、被禁用、不受支持或真实 spawn 失败后使用的单 Agent 保底状态。
 
+进入 `SEQUENTIAL_ROLE_FALLBACK` 必须提供具体原因，Runtime 会保存为 `fallbackReason`，Dashboard 会直接显示“保底原因”。
+
+一旦真实原生子 Agent 已经成功记录，`NATIVE_SUBAGENTS` 对本次团队运行保持锁定；即使当前活跃原生 Agent 暂时为 0，也不能再降级到 `UNKNOWN` 或保底模式。
+
 Dashboard 对应显示：
 
 ```text
@@ -51,7 +55,7 @@ Dashboard 对应显示：
 
 ## Runtime 工具
 
-v0.3.0 Runtime 提供 10 个工具：
+v0.3.1 Runtime 提供 10 个工具：
 
 - `agent_team_create`
 - `agent_team_get`
@@ -85,9 +89,16 @@ Runtime 任务：  T1
 
 ## 主任务与动态后续任务
 
-`agent_team_create` 创建团队时已经存在的任务，在 Dashboard 中视为 **主任务**。
+v0.3.1 使用 schema v5，把任务类别直接写入 Runtime 状态：
 
-之后通过 `agent_team_add_task` 新增的任务会单独显示为 **动态后续任务**，典型包括：
+```text
+taskClass: main
+taskClass: dynamic
+```
+
+`agent_team_create` 创建的初始任务强制保存为 `main`；之后通过 `agent_team_add_task` 新增的任务强制保存为 `dynamic`。
+
+典型动态任务包括：
 
 ```text
 Bug 修复
@@ -97,7 +108,7 @@ Re-review
 执行过程中发现的其他后续工作
 ```
 
-这样顶部主任务总数会保持稳定，不会随着后续工作不断出现 `8/9 → 9/11 → 12/14` 这类分母持续增长的情况。
+这样顶部主任务总数保持稳定，不会随着后续工作不断出现 `8/9 → 9/11 → 12/14` 这类分母持续增长。旧 schema v4 状态仍可兼容：Runtime 会根据已有 `task_added` 事件恢复动态任务语义。
 
 ## Review 修复闭环
 
@@ -123,14 +134,18 @@ Smoke test 会验证：
 
 - 新工作区行为；
 - 10 个 Runtime 工具；
+- schema v5 与 `taskClass`；
 - 原生子 Agent 生命周期记录；
 - 执行模式切换；
+- 保底模式必须提供原因；
+- 原生模式成功后禁止降级；
 - 关联任务完成门禁；
 - 依赖调度；
 - 最终成员状态收敛；
 - 修复任务重新打开团队；
 - Dashboard 原生 Agent 状态；
-- Dashboard 主任务 / 动态任务分离。
+- Dashboard 主任务 / 动态任务分离；
+- Dashboard 保底原因显示。
 
 期望输出：
 
