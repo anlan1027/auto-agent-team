@@ -6,7 +6,7 @@
 
 面向 OpenAI Codex 的自动多 Agent 工程编排项目。
 
-**v0.3.0** 的核心目标是：让用户只描述项目目标，由 Manager 自动分析需求、建立任务图、默认使用 Codex 原生 Subagent 完成适合独立执行的工作，并通过本地 Runtime 与 Dashboard 真实记录成员、任务、依赖、原生 Agent、验证和审查状态。
+**v0.3.1** 的核心目标是：让用户只描述项目目标，由 Manager 自动分析需求、建立任务图、默认使用 Codex 原生 Subagent 完成适合独立执行的工作，并通过本地 Runtime 与 Dashboard 真实记录成员、任务、依赖、原生 Agent、验证和审查状态。
 
 ---
 
@@ -79,7 +79,15 @@ Dashboard 对它的用户可见名称是：
 保底模式（单 Agent）
 ```
 
-它不是默认 Agent Team 模式。
+它不是默认 Agent Team 模式。进入保底现在必须记录具体原因，Dashboard 会直接显示“保底原因”。
+
+一旦本次团队运行已经成功记录过至少一个真实原生子 Agent，执行模式会锁定为：
+
+```text
+NATIVE_SUBAGENTS
+```
+
+即使某个阶段暂时出现 `0` 个正在运行的原生 Agent，也不会再降级回 `UNKNOWN` 或单 Agent 保底模式。
 
 ---
 
@@ -111,6 +119,7 @@ Dashboard 可以显示：
 
 - 执行阶段：计划 → 执行 → 验证 → 审查 → 完成
 - 原生多 Agent / 单 Agent 保底状态
+- 保底模式的具体原因
 - 逻辑成员和当前状态
 - 当前运行中的原生 Agent 与已记录 Agent
 - 原生 Agent 的显示名、逻辑角色、任务、结果和证据
@@ -123,13 +132,25 @@ Dashboard 可以显示：
 
 ### 主任务与动态子任务
 
-团队创建时的初始任务作为 **主任务**。顶部进度保持稳定，例如：
+团队创建时的初始任务作为 **主任务**，Runtime 直接持久化：
+
+```text
+taskClass: main
+```
+
+执行过程中通过 `agent_team_add_task` 新增的 Bug 修复、回归测试、Review 修复、Re-review 等作为 **动态子任务**，Runtime 持久化：
+
+```text
+taskClass: dynamic
+```
+
+顶部进度保持稳定，例如：
 
 ```text
 主任务完成 8/9
 ```
 
-执行过程中通过 `agent_team_add_task` 新增的 Bug 修复、回归测试、Review 修复、Re-review 等会单独作为 **动态子任务** 显示，不再让顶部主任务分母不断增加。
+动态子任务会单独显示，不再让顶部主任务分母不断增加。旧的 schema v4 状态会根据已有 `task_added` 事件自动兼容迁移到 schema v5 语义。
 
 ---
 
@@ -156,7 +177,7 @@ task: T1
 status: running → done
 ```
 
-Runtime 会自动把真实原生 Agent 启动视为 `NATIVE_SUBAGENTS` 证据，并阻止仍有活跃原生 Agent 时提前完成关联任务。
+Runtime 会自动把真实原生 Agent 启动视为 `NATIVE_SUBAGENTS` 证据，并阻止仍有活跃原生 Agent 时提前完成关联任务。v0.3.1 起，只要真实原生 Agent 已记录，本次团队运行就不能再被手动降级为保底模式。
 
 ---
 
@@ -293,6 +314,7 @@ auto-agent-team/
     ├── .codex-plugin/plugin.json
     ├── .mcp.json
     ├── README.md
+    ├── README_EN.md
     ├── mcp/server.mjs
     ├── scripts/smoke-test.mjs
     └── ui/team-dashboard.html
@@ -303,19 +325,18 @@ auto-agent-team/
 # 当前版本
 
 ```text
-v0.3.0
+v0.3.1
 ```
 
-v0.3.0 重点：
+v0.3.1 在 v0.3.0 稳定线之上重点加固：
 
 ```text
-项目级自动触发
-→ Runtime 启动
-→ 原生 Agent Team 默认执行
-→ 真实 native lifecycle 记录
-→ 任务依赖 / 并行 / 验证 / 审查
-→ 主任务固定进度 + 动态子任务
-→ 单 Agent 仅作为真实失败后的保底
+主任务 / 动态任务写入 Runtime 数据
+→ schema v5
+→ 保底模式必须提供具体原因
+→ Dashboard 显示保底原因
+→ 真实 native Agent 一旦成功记录，NATIVE_SUBAGENTS 本次运行不可降级
+→ smoke test 覆盖这些状态真实性规则
 ```
 
 详细变更见 `CHANGELOG.md`。
