@@ -4,7 +4,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "Auto Agent Team Runtime";
-const SERVER_VERSION = "0.3.0";
+const SERVER_VERSION = "0.3.1";
 const TEMPLATE_URI = "ui://auto-agent-team/team-dashboard.html";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = path.resolve(__dirname, "..");
@@ -12,6 +12,7 @@ const UI_PATH = path.join(PLUGIN_ROOT, "ui", "team-dashboard.html");
 
 const MEMBER_STATUSES = new Set(["idle", "working", "blocked", "done", "failed"]);
 const TASK_STATUSES = new Set(["pending", "ready", "running", "blocked", "done", "failed"]);
+const TASK_CLASSES = new Set(["main", "dynamic"]);
 const PHASES = new Set(["planning", "running", "integrating", "verifying", "reviewing", "completed", "blocked"]);
 const EXECUTION_MODES = new Set(["NATIVE_SUBAGENTS", "SEQUENTIAL_ROLE_FALLBACK", "UNKNOWN"]);
 const NATIVE_AGENT_STATUSES = new Set(["running", "done", "failed", "cancelled"]);
@@ -26,6 +27,9 @@ function now() { return new Date().toISOString(); }
 function requireString(value, name) {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${name} must be a non-empty string.`);
   return value.trim();
+}
+function optionalString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 function workspaceRoot(value) {
   const root = path.resolve(requireString(value, "workspacePath"));
@@ -75,6 +79,7 @@ function normalizeTasks(value) {
     id: String(t?.id || `t${i + 1}`),
     subject: String(t?.subject || t?.objective || `Task ${i + 1}`),
     status: TASK_STATUSES.has(t?.status) ? t.status : "pending",
+    taskClass: TASK_CLASSES.has(t?.taskClass) ? t.taskClass : null,
     assignee: t?.assignee ? String(t.assignee) : null,
     dependencies: Array.isArray(t?.dependencies) ? t.dependencies.map(String) : [],
     kind: String(t?.kind || "task"),
@@ -108,12 +113,21 @@ function normalizeNativeAgents(value) {
   }));
 }
 function normalizeState(state) {
-  state.schemaVersion = Math.max(Number(state.schemaVersion) || 0, 4);
+  state.schemaVersion = Math.max(Number(state.schemaVersion) || 0, 5);
   state.members = normalizeMembers(state.members);
   state.tasks = normalizeTasks(state.tasks);
   state.nativeAgents = normalizeNativeAgents(state.nativeAgents);
   state.events = Array.isArray(state.events) ? state.events : [];
+  const legacyDynamicIds = new Set(state.events.filter(event => event?.kind === "task_added" && event?.taskId).map(event => String(event.taskId)));
+  for (const task of state.tasks) {
+    if (!TASK_CLASSES.has(task.taskClass)) task.taskClass = legacyDynamicIds.has(task.id) ? "dynamic" : "main";
+  }
   state.executionMode = EXECUTION_MODES.has(state.executionMode) ? state.executionMode : "UNKNOWN";
+  state.fallbackReason = optionalString(state.fallbackReason);
+  if (state.nativeAgents.length > 0 && state.executionMode !== "NATIVE_SUBAGENTS") {
+    state.executionMode = "NATIVE_SUBAGENTS";
+    state.fallbackReason = null;
+  }
   state.phase = PHASES.has(state.phase) ? state.phase : "planning";
   return state;
 }
@@ -134,11 +148,12 @@ function requiredWorkspaceState(args) {
 }
 function uninitializedDashboardState(root) {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     id: "uninitialized-agent-team",
     name: "Auto Agent Team",
     description: "尚未初始化团队状态。Manager 应先创建本项目的 Agent Team。",
     executionMode: "UNKNOWN",
+    fallbackReason: null,
     phase: "planning",
     planReviewState: "not_required",
     createdAt: null,
@@ -162,6 +177,7 @@ function validateTaskGraph(state) {
   const ids = new Set();
   for (const task of state.tasks) {
     if (ids.has(task.id)) throw new Error(`Duplicate task id: ${task.id}`);
+    if (!TASK_CLASSES.has(task.taskClass)) throw new Error(`Task ${task.id} has invalid taskClass: ${task.taskClass}`);
     ids.add(task.id);
   }
   const memberIds = new Set();
@@ -344,20 +360,20 @@ function findNativeAgent(state, args) {
 const tools = [
   {
     name: "agent_team_create", title: "Create Agent Team state",
-    description: "Create or replace Agent Team state. Start executionMode UNKNOWN unless native delegation or fallback has already been proven.",
-    inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, name: { type: "string" }, description: { type: "string" }, executionMode: { type: "string", enum: [...EXECUTION_MODES] }, phase: { type: "string", enum: [...PHASES] }, members: { type: "array", items: { type: "object", additionalProperties: true } }, tasks: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["workspacePath", "name"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    description: "Create or replace Agent Team state. New teams should start UNKNOWN. Direct NATIVE_SUBAGENTS creation is rejected; fallback creation requires a concrete reason.",
+    inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, name: { type: "string" }, description: { type: "string" }, executionMode: { type: "string", enum: [...EXECUTION_MODES] }, reason: { type: "string" }, phase: { type: "string", enum: [...PHASES] }, members: { type: "array", items: { type: "object", additionalProperties: true } }, tasks: { type: "array", items: { type: "object", additionalProperties: true } } }, required: ["workspacePath", "name"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
   },
   {
-    name: "agent_team_get", title: "Get Agent Team state", description: "Read and reconcile current Agent Team state. Returns initialized=false when no state exists yet.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" } }, required: ["workspacePath"] }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    name: "agent_team_get", title: "Get Agent Team state", description: "Read, migrate, and reconcile current Agent Team state. Returns initialized=false when no state exists yet.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" } }, required: ["workspacePath"] }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
   {
-    name: "agent_team_set_execution_mode", title: "Set Agent Team execution mode", description: "Update execution mode after evidence changes. Native subagent start also switches mode to NATIVE_SUBAGENTS automatically.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, executionMode: { type: "string", enum: [...EXECUTION_MODES] }, reason: { type: "string" } }, required: ["workspacePath", "executionMode"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    name: "agent_team_set_execution_mode", title: "Set Agent Team execution mode", description: "Update execution mode after evidence changes. Fallback requires a concrete reason. Once any real native subagent has been recorded, NATIVE_SUBAGENTS is sticky for that team run and cannot be downgraded.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, executionMode: { type: "string", enum: [...EXECUTION_MODES] }, reason: { type: "string" } }, required: ["workspacePath", "executionMode"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
   {
-    name: "agent_team_add_task", title: "Add Agent Team task", description: "Append a remediation, regression, re-review, or other newly discovered task.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, task: { type: "object", additionalProperties: true } }, required: ["workspacePath", "task"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    name: "agent_team_add_task", title: "Add Agent Team task", description: "Append a newly discovered dynamic task such as remediation, regression, re-review, or other follow-up work. Added tasks are persisted with taskClass=dynamic.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, task: { type: "object", additionalProperties: true } }, required: ["workspacePath", "task"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
   },
   {
-    name: "agent_team_subagent_started", title: "Record native Codex subagent start", description: "Record a real native Codex subagent after delegation succeeds. This automatically sets executionMode=NATIVE_SUBAGENTS, tracks its display name/role/task, keeps the linked member working, and prevents premature team completion while the subagent is active.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, nativeAgentId: { type: "string" }, name: { type: "string" }, role: { type: "string" }, memberId: { type: ["string", "null"] }, taskId: { type: ["string", "null"] }, summary: { type: "string" } }, required: ["workspacePath", "name", "role"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    name: "agent_team_subagent_started", title: "Record native Codex subagent start", description: "Record a real native Codex subagent after delegation succeeds. This automatically sets and locks executionMode=NATIVE_SUBAGENTS for the current team run, tracks its display name/role/task, keeps the linked member working, and prevents premature completion while active.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, nativeAgentId: { type: "string" }, name: { type: "string" }, role: { type: "string" }, memberId: { type: ["string", "null"] }, taskId: { type: ["string", "null"] }, summary: { type: "string" } }, required: ["workspacePath", "name", "role"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
   {
     name: "agent_team_subagent_finished", title: "Record native Codex subagent finish", description: "Record the result of a tracked native Codex subagent. Updates the linked task/member, stores concise result/evidence, and only allows completion after no native subagent remains active.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, nativeAgentId: { type: "string" }, name: { type: "string" }, status: { type: "string", enum: ["done", "failed", "cancelled"] }, result: { type: "string" }, evidence: { type: "array", items: { type: "string" } } }, required: ["workspacePath", "status"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
@@ -366,7 +382,7 @@ const tools = [
     name: "agent_team_update_member", title: "Update Agent Team member", description: "Record a truthful logical member status when no more specific native-subagent lifecycle event applies.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, memberId: { type: "string" }, status: { type: "string", enum: [...MEMBER_STATUSES] }, currentTask: { type: ["string", "null"] }, summary: { type: "string" } }, required: ["workspacePath", "memberId"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
   {
-    name: "agent_team_update_task", title: "Update Agent Team task", description: "Update one logical task after real work occurs. Do not mark a task done while its linked native subagent is still running.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, taskId: { type: "string" }, status: { type: "string", enum: [...TASK_STATUSES] }, result: { type: "string" }, evidence: { type: "array", items: { type: "string" } } }, required: ["workspacePath", "taskId"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    name: "agent_team_update_task", title: "Update Agent Team task", description: "Update one logical task after real work occurs. taskClass is immutable here. Do not mark a task done while its linked native subagent is still running.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, taskId: { type: "string" }, status: { type: "string", enum: [...TASK_STATUSES] }, result: { type: "string" }, evidence: { type: "array", items: { type: "string" } } }, required: ["workspacePath", "taskId"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
   {
     name: "agent_team_append_event", title: "Append Agent Team event", description: "Record an important orchestration event.", inputSchema: { type: "object", properties: { workspacePath: { type: "string" }, kind: { type: "string" }, message: { type: "string" }, memberId: { type: ["string", "null"] }, taskId: { type: ["string", "null"] } }, required: ["workspacePath", "kind", "message"] }, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
@@ -379,9 +395,15 @@ const tools = [
 function callTool(name, args = {}) {
   if (name === "agent_team_create") {
     const root = workspaceRoot(args.workspacePath);
-    const state = { schemaVersion: 4, id: slug(args.name), name: requireString(args.name, "name"), description: typeof args.description === "string" ? args.description : "", executionMode: EXECUTION_MODES.has(args.executionMode) ? args.executionMode : "UNKNOWN", phase: PHASES.has(args.phase) ? args.phase : "planning", planReviewState: "not_required", createdAt: now(), updatedAt: now(), members: normalizeMembers(args.members), tasks: normalizeTasks(args.tasks), nativeAgents: [], events: [] };
+    const requestedMode = EXECUTION_MODES.has(args.executionMode) ? args.executionMode : "UNKNOWN";
+    const reason = optionalString(args.reason);
+    if (requestedMode === "NATIVE_SUBAGENTS") throw new Error("Cannot create a team directly in NATIVE_SUBAGENTS. Create it as UNKNOWN, then record the successful native spawn with agent_team_subagent_started.");
+    if (requestedMode === "SEQUENTIAL_ROLE_FALLBACK" && !reason) throw new Error("SEQUENTIAL_ROLE_FALLBACK requires a concrete reason describing native-spawn unavailability or failure.");
+    const tasks = normalizeTasks(args.tasks).map(task => ({ ...task, taskClass: "main" }));
+    const state = { schemaVersion: 5, id: slug(args.name), name: requireString(args.name, "name"), description: typeof args.description === "string" ? args.description : "", executionMode: requestedMode, fallbackReason: requestedMode === "SEQUENTIAL_ROLE_FALLBACK" ? reason : null, phase: PHASES.has(args.phase) ? args.phase : "planning", planReviewState: "not_required", createdAt: now(), updatedAt: now(), members: normalizeMembers(args.members), tasks, nativeAgents: [], events: [] };
     validateTaskGraph(state);
-    appendEvent(state, "team_created", `Created Agent Team with ${state.members.length} members and ${state.tasks.length} tasks.`);
+    appendEvent(state, "team_created", `Created Agent Team with ${state.members.length} members and ${state.tasks.length} main tasks.`);
+    if (state.executionMode === "SEQUENTIAL_ROLE_FALLBACK") appendEvent(state, "fallback_mode_selected", `Fallback selected at team creation. Reason: ${state.fallbackReason}`);
     reconcileState(state); writeState(root, state);
     return textAndStructured(`Created Agent Team "${state.name}".`, { workspacePath: root, statePath: statePath(root), initialized: true, team: state });
   }
@@ -394,20 +416,29 @@ function callTool(name, args = {}) {
   if (name === "agent_team_set_execution_mode") {
     const { root, state } = requiredWorkspaceState(args);
     if (!EXECUTION_MODES.has(args.executionMode)) throw new Error(`Invalid executionMode: ${args.executionMode}`);
-    const previous = state.executionMode; state.executionMode = args.executionMode;
-    const reason = typeof args.reason === "string" && args.reason.trim() ? ` ${args.reason.trim()}` : "";
-    if (previous !== state.executionMode) appendEvent(state, "execution_mode_changed", `Execution mode ${previous} → ${state.executionMode}.${reason}`);
+    const target = args.executionMode;
+    const reason = optionalString(args.reason);
+    if (state.nativeAgents.length > 0 && target !== "NATIVE_SUBAGENTS") throw new Error("NATIVE_SUBAGENTS is sticky for this team run because a real native subagent has already been recorded; execution mode cannot be downgraded.");
+    if (target === "NATIVE_SUBAGENTS" && state.nativeAgents.length === 0) throw new Error("Cannot set NATIVE_SUBAGENTS without a tracked native subagent. Record the real native spawn with agent_team_subagent_started instead.");
+    if (target === "SEQUENTIAL_ROLE_FALLBACK" && !reason) throw new Error("SEQUENTIAL_ROLE_FALLBACK requires a concrete reason describing native-spawn unavailability or failure.");
+    const previous = state.executionMode;
+    state.executionMode = target;
+    state.fallbackReason = target === "SEQUENTIAL_ROLE_FALLBACK" ? reason : null;
+    if (previous !== target) appendEvent(state, "execution_mode_changed", `Execution mode ${previous} → ${target}.${reason ? ` Reason: ${reason}` : ""}`);
+    else if (target === "SEQUENTIAL_ROLE_FALLBACK" && reason) appendEvent(state, "fallback_reason_updated", `Fallback reason: ${reason}`);
     writeState(root, state);
     return textAndStructured(`Execution mode is now ${state.executionMode}.`, { workspacePath: root, statePath: statePath(root), initialized: true, team: state });
   }
   if (name === "agent_team_add_task") {
     const { root, state } = requiredWorkspaceState(args);
     if (!args.task || typeof args.task !== "object" || Array.isArray(args.task)) throw new Error("task must be an object.");
-    const task = normalizeTasks([args.task])[0]; state.tasks.push(task);
+    const task = normalizeTasks([args.task])[0];
+    task.taskClass = "dynamic";
+    state.tasks.push(task);
     try { validateTaskGraph(state); } catch (e) { state.tasks.pop(); throw e; }
-    appendEvent(state, "task_added", `Added ${task.id}: ${task.subject}.`, task.assignee, task.id);
+    appendEvent(state, "task_added", `Added dynamic task ${task.id}: ${task.subject}.`, task.assignee, task.id);
     reconcileState(state); writeState(root, state);
-    return textAndStructured(`Added task ${task.id}.`, { workspacePath: root, statePath: statePath(root), initialized: true, team: state });
+    return textAndStructured(`Added dynamic task ${task.id}.`, { workspacePath: root, statePath: statePath(root), initialized: true, team: state });
   }
   if (name === "agent_team_subagent_started") {
     const { root, state } = requiredWorkspaceState(args);
@@ -434,6 +465,7 @@ function callTool(name, args = {}) {
       const previous = state.executionMode; state.executionMode = "NATIVE_SUBAGENTS";
       appendEvent(state, "execution_mode_changed", `Execution mode ${previous} → NATIVE_SUBAGENTS because native subagent ${agent.name} started.`);
     }
+    state.fallbackReason = null;
     appendEvent(state, "subagent_started", `${agent.name} started as ${agent.role}${agent.taskId ? ` on ${agent.taskId}` : ""}.`, agent.memberId, agent.taskId);
     reconcileState(state); writeState(root, state);
     return textAndStructured(`Recorded native subagent ${agent.name} as running.`, { workspacePath: root, statePath: statePath(root), initialized: true, nativeAgent: agent, team: state });
@@ -485,7 +517,7 @@ function callTool(name, args = {}) {
 
 function handle(id, method, params) {
   if (method === "initialize") {
-    result(id, { protocolVersion: params?.protocolVersion ?? "2025-11-25", capabilities: { tools: {}, resources: {} }, serverInfo: { name: SERVER_NAME, version: SERVER_VERSION }, instructions: "Maintain truthful Agent Team state. On every successful native Codex delegation, call agent_team_subagent_started immediately with the Codex display name, role, member/task mapping when known. When that subagent returns or fails, call agent_team_subagent_finished before marking its task complete. Active native subagents prevent phase=completed. Native subagent start automatically switches execution mode to NATIVE_SUBAGENTS." });
+    result(id, { protocolVersion: params?.protocolVersion ?? "2025-11-25", capabilities: { tools: {}, resources: {} }, serverInfo: { name: SERVER_NAME, version: SERVER_VERSION }, instructions: "Maintain truthful Agent Team state. Main tasks are created with taskClass=main; newly discovered follow-up work added through agent_team_add_task is taskClass=dynamic. On every successful native Codex delegation, call agent_team_subagent_started immediately with the Codex display name, role, member/task mapping when known. When that subagent returns or fails, call agent_team_subagent_finished before marking its task complete. Active native subagents prevent phase=completed. Native subagent start automatically switches execution mode to NATIVE_SUBAGENTS, and that native mode is sticky for the rest of the team run. SEQUENTIAL_ROLE_FALLBACK requires a concrete native-spawn failure/unavailability reason." });
     return;
   }
   if (method === "ping") return result(id, {});
@@ -494,7 +526,7 @@ function handle(id, method, params) {
   if (method === "resources/list") return result(id, { resources: [{ uri: TEMPLATE_URI, name: "Agent Team Dashboard", mimeType: "text/html;profile=mcp-app" }] });
   if (method === "resources/read") {
     if (params?.uri !== TEMPLATE_URI) return error(id, JsonRpcError.INVALID_PARAMS, `Unknown resource: ${params?.uri ?? ""}`);
-    try { const html = fs.readFileSync(UI_PATH, "utf8"); result(id, { contents: [{ uri: TEMPLATE_URI, mimeType: "text/html;profile=mcp-app", text: html, _meta: { ui: { prefersBorder: true } } }] });
+    try { const html = fs.readFileSync(UI_PATH, "utf8"); result(id, { contents: [{ uri: TEMPLATE_URI, mimeType: "text/html;profile=mcp-app", text: html, _meta: { ui: { prefersBorder: true } } }] }); }
     catch (e) { error(id, JsonRpcError.INTERNAL, e instanceof Error ? e.message : String(e)); }
     return;
   }
