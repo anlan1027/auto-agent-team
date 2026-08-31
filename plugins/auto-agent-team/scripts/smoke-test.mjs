@@ -37,7 +37,7 @@ const native = (s, name) => s.nativeAgents.find(a => a.name === name);
 
 try {
   const init = await request("initialize", { protocolVersion: "2025-11-25" });
-  assert(init.serverInfo.version === "0.3.0", "wrong runtime version");
+  assert(init.serverInfo.version === "0.3.1", "wrong runtime version");
   const list = await request("tools/list");
   assert(list.tools.length === 10, "expected 10 tools");
   assert(list.tools.some(t => t.name === "agent_team_subagent_started"), "missing subagent started tool");
@@ -47,6 +47,7 @@ try {
   assert(emptyGet.structuredContent.initialized === false, "fresh get should not fail");
   const emptyRender = await request("tools/call", { name: "agent_team_render_dashboard", arguments: { workspacePath: emptyWorkspace } });
   assert(team(emptyRender).id === "uninitialized-agent-team", "fresh render should be uninitialized");
+  assert(team(emptyRender).schemaVersion === 5, "uninitialized dashboard should use schema 5");
   assert(Array.isArray(team(emptyRender).nativeAgents), "uninitialized dashboard should include nativeAgents");
 
   let s = team(await request("tools/call", { name: "agent_team_create", arguments: {
@@ -64,9 +65,36 @@ try {
       { id: "t4", subject: "Review", assignee: "reviewer", kind: "review", dependencies: ["t2"] }
     ]
   } }));
-  assert(s.schemaVersion === 4, "expected schema 4");
+  assert(s.schemaVersion === 5, "expected schema 5");
   assert(s.executionMode === "UNKNOWN", "mode should start UNKNOWN");
+  assert(s.tasks.every(t => t.taskClass === "main"), "creation tasks should all be main tasks");
   assert(task(s,"t1").status === "ready", "t1 should be ready");
+
+  let fallbackWithoutReasonRejected = false;
+  try {
+    await request("tools/call", { name: "agent_team_set_execution_mode", arguments: { workspacePath: workspace, executionMode: "SEQUENTIAL_ROLE_FALLBACK" } });
+  } catch (e) {
+    fallbackWithoutReasonRejected = /requires a concrete reason/i.test(e.message);
+  }
+  assert(fallbackWithoutReasonRejected, "fallback should require a concrete reason");
+
+  let directNativeRejected = false;
+  try {
+    await request("tools/call", { name: "agent_team_set_execution_mode", arguments: { workspacePath: workspace, executionMode: "NATIVE_SUBAGENTS" } });
+  } catch (e) {
+    directNativeRejected = /tracked native subagent/i.test(e.message);
+  }
+  assert(directNativeRejected, "native mode should require a tracked real native subagent");
+
+  s = team(await request("tools/call", { name: "agent_team_set_execution_mode", arguments: {
+    workspacePath: workspace, executionMode: "SEQUENTIAL_ROLE_FALLBACK", reason: "Host reports native spawn unsupported"
+  } }));
+  assert(s.executionMode === "SEQUENTIAL_ROLE_FALLBACK", "fallback should be allowed with reason before native delegation");
+  assert(s.fallbackReason === "Host reports native spawn unsupported", "fallback reason should persist");
+
+  s = team(await request("tools/call", { name: "agent_team_set_execution_mode", arguments: { workspacePath: workspace, executionMode: "UNKNOWN" } }));
+  assert(s.executionMode === "UNKNOWN", "pre-native fallback may return to UNKNOWN for reassessment");
+  assert(s.fallbackReason === null, "leaving fallback should clear fallback reason");
 
   for (const id of ["t1","t2","t3"]) {
     s = team(await request("tools/call", { name: "agent_team_update_task", arguments: { workspacePath: workspace, taskId: id, status: "done" } }));
@@ -77,6 +105,7 @@ try {
     workspacePath: workspace, nativeAgentId: "wegener-1", name: "Wegener", role: "Reviewer", memberId: "reviewer", taskId: "t4", summary: "Independent code review"
   } }));
   assert(s.executionMode === "NATIVE_SUBAGENTS", "native start should switch execution mode");
+  assert(s.fallbackReason === null, "native start should clear stale fallback reason");
   assert(native(s,"Wegener")?.status === "running", "Wegener should be running");
   assert(task(s,"t4").status === "running", "linked review task should become running");
   assert(member(s,"reviewer").status === "working", "reviewer member should be working");
@@ -96,19 +125,34 @@ try {
   assert(native(s,"Wegener")?.status === "done", "Wegener should be done");
   assert(task(s,"t4").status === "done", "review task should complete with subagent");
   assert(task(s,"t4").result === "2 High findings", "review result should propagate to task");
+  assert(s.executionMode === "NATIVE_SUBAGENTS", "native mode should remain after active native count returns to zero");
   assert(s.phase === "completed", "team may complete once tasks done and no native agent is active");
   assert(s.members.every(m => m.status === "done" && m.currentTask === null), "completed team should converge members");
+
+  let nativeDowngradeRejected = false;
+  try {
+    await request("tools/call", { name: "agent_team_set_execution_mode", arguments: {
+      workspacePath: workspace, executionMode: "SEQUENTIAL_ROLE_FALLBACK", reason: "Trying to downgrade after native success"
+    } });
+  } catch (e) {
+    nativeDowngradeRejected = /sticky/i.test(e.message);
+  }
+  assert(nativeDowngradeRejected, "native mode should be sticky once a real native subagent has been recorded");
 
   s = team(await request("tools/call", { name: "agent_team_add_task", arguments: { workspacePath: workspace, task: {
     id: "t5", subject: "Fix review findings", assignee: "developer", kind: "implementation", dependencies: ["t4"]
   } } }));
   assert(s.phase !== "completed", "adding remediation should reopen team");
   assert(task(s,"t5").status === "ready", "remediation should be ready");
+  assert(task(s,"t5").taskClass === "dynamic", "added remediation should be a dynamic task");
+  assert(s.tasks.filter(t => t.taskClass === "main").length === 4, "main task denominator should remain fixed");
 
   const resource = await request("resources/read", { uri: "ui://auto-agent-team/team-dashboard.html" });
   const html = resource?.contents?.[0]?.text || "";
   assert(html.includes("原生子智能体") && html.includes("仍有 ${activeNative.length} 个原生子智能体运行中"), "dashboard should expose native subagent state");
   assert(html.includes("主任务完成") && html.includes("动态子任务"), "dashboard should separate main and dynamic tasks");
+  assert(html.includes('t.taskClass==="dynamic"'), "dashboard should prefer persisted runtime taskClass");
+  assert(html.includes("保底原因"), "dashboard should display fallback reason when fallback is active");
 
   console.log("Auto Agent Team runtime smoke test passed.");
 } finally {
