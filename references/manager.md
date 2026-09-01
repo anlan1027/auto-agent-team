@@ -150,6 +150,18 @@ After a successful native spawn, immediately call:
 agent_team_subagent_started
 ```
 
+This synchronization must be adjacent to the real spawn boundary:
+
+```text
+native spawn succeeds / host returns handle or display name
+↓
+FIRST Runtime action: agent_team_subagent_started
+↓
+only then wait, spawn another agent, or continue unrelated Manager work
+```
+
+For multiple independent native spawns, record each successful spawn as soon as its handle/name is returned. Do not wait until the end of a batch and backfill lifecycle events later.
+
 Record the native display name, logical role, mapped member, and mapped task when known.
 
 When the real native agent returns/fails/is cancelled, call:
@@ -191,7 +203,48 @@ Keep Runtime task state synchronized with real work:
 pending → ready → running → done
 ```
 
-Use `agent_team_add_task` for remediation, regression, and re-review work rather than rewriting completed history.
+Give every task a meaningful subject and the most accurate `kind` available. Do not intentionally create generic titles such as `Task 1` when the actual purpose is known.
+
+Preferred role-to-kind mapping:
+
+```text
+Researcher / Explorer → research
+Architect → architecture
+Developer → implementation
+Tester / QA → verification
+Debugger → debug
+Reviewer / Security Reviewer → review
+```
+
+Runtime may infer missing task semantics as a safety net, but the Manager should still provide specific subjects such as:
+
+```text
+Fix API-key exposure found by security review
+Add generic usage/balance Provider Adapter
+Run regression verification
+Re-review concurrency fixes
+```
+
+Use `agent_team_add_task` for remediation, regression, and re-review work rather than rewriting completed history. Dynamic follow-up tasks should describe the actual discovered issue instead of using generic numbering.
+
+### Project phase truthfulness
+
+The global project phase is driven by formal Runtime task state, not merely by the role of a sidecar native agent.
+
+Examples:
+
+```text
+implementation main task running + sidecar Tester planning
+→ phase remains running / 执行
+
+formal verification task running
+→ phase = verifying / 验证
+
+formal review task running
+→ phase = reviewing / 审查
+```
+
+A Researcher/Tester sidecar without a running formal task must not prematurely advance the whole project to verification or review.
 
 ---
 
