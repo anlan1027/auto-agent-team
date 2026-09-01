@@ -6,7 +6,7 @@
 
 面向 OpenAI Codex 的自动多 Agent 工程编排项目。
 
-**v0.3.1** 的核心目标是：让用户只描述项目目标，由 Manager 自动分析需求、建立任务图、默认使用 Codex 原生 Subagent 完成适合独立执行的工作，并通过本地 Runtime 与 Dashboard 真实记录成员、任务、依赖、原生 Agent、验证和审查状态。
+**v0.3.2** 的核心目标是：让用户只描述项目目标，由 Manager 自动分析需求、建立任务图、默认使用 Codex 原生 Subagent 完成适合独立执行的工作，并通过本地 Runtime 与 Dashboard 真实记录成员、任务、依赖、原生 Agent、验证和审查状态。
 
 ---
 
@@ -67,7 +67,7 @@ cross-task delegation
 self-review
 ```
 
-如果真实 native spawn 不可用、被禁用、不支持，或实际调用失败，才允许进入内部状态：
+如果真实 native spawn 不可用、被禁用、不支持，或实际调用失败，才允许进入：
 
 ```text
 SEQUENTIAL_ROLE_FALLBACK
@@ -79,9 +79,9 @@ Dashboard 对它的用户可见名称是：
 保底模式（单 Agent）
 ```
 
-它不是默认 Agent Team 模式。进入保底现在必须记录具体原因，Dashboard 会直接显示“保底原因”。
+进入保底必须记录具体原因，Dashboard 会直接显示“保底原因”。
 
-一旦本次团队运行已经成功记录过至少一个真实原生子 Agent，执行模式会锁定为：
+一旦本次团队运行已经成功记录过至少一个真实原生子 Agent，执行模式锁定为：
 
 ```text
 NATIVE_SUBAGENTS
@@ -132,13 +132,13 @@ Dashboard 可以显示：
 
 ### 主任务与动态子任务
 
-团队创建时的初始任务作为 **主任务**，Runtime 直接持久化：
+团队创建时的初始任务作为 **主任务**：
 
 ```text
 taskClass: main
 ```
 
-执行过程中通过 `agent_team_add_task` 新增的 Bug 修复、回归测试、Review 修复、Re-review 等作为 **动态子任务**，Runtime 持久化：
+执行过程中通过 `agent_team_add_task` 新增的 Bug 修复、回归测试、Review 修复、Re-review 等作为 **动态子任务**：
 
 ```text
 taskClass: dynamic
@@ -150,13 +150,72 @@ taskClass: dynamic
 主任务完成 8/9
 ```
 
-动态子任务会单独显示，不再让顶部主任务分母不断增加。旧的 schema v4 状态会根据已有 `task_added` 事件自动兼容迁移到 schema v5 语义。
+动态子任务会单独显示，不再让顶部主任务分母不断增加。旧 schema v4 状态会根据已有 `task_added` 事件自动兼容到 schema v5 语义。
+
+---
+
+## v0.3.2：任务语义与阶段真实性
+
+v0.3.2 解决了完整项目实测中暴露的两个 Dashboard 真实性问题。
+
+### 1. 任务类型自动补全
+
+当任务没有显式 `kind`，或错误写成通用 `task` 时，Runtime 会根据逻辑成员角色推断：
+
+```text
+Researcher / Explorer → research
+Architect → architecture
+Developer → implementation
+Tester / QA → verification
+Debugger → debug
+Reviewer / Security Reviewer → review
+```
+
+因此即使旧任务曾保存成：
+
+```text
+T3 · tester · kind=task
+T4 · reviewer · kind=task
+```
+
+Dashboard 的“测试 / Verification”和“Review / Re-review”区域仍会正确显示真实结果，而不是错误显示“暂无结果”。
+
+### 2. 项目阶段由正式任务驱动
+
+全局阶段不再仅根据当前某个原生 Agent 的角色判断，而是优先根据正在运行的正式 Runtime 主任务判断。
+
+```text
+T2 implementation 正在执行
++ sidecar Tester 只是在提前规划测试
+→ 全局仍然显示“执行”
+
+T3 verification 真正开始 running
+→ 全局进入“验证”
+
+T4 review 真正开始 running
+→ 全局进入“审查”
+```
+
+这样不会再因为一个 sidecar Tester / Researcher 的准备工作提前推进整个项目阶段。
+
+### 3. 通用任务标题归一化
+
+当任务标题是 `Task 1`、`Task 2` 等通用名称时，Runtime 会结合角色、任务类型、objective 和已有结果尽量替换成更有意义的标题。
+
+Manager 仍被要求优先直接写出具体任务主题，尤其是动态任务，例如：
+
+```text
+修复安全审查发现的 API Key 暴露
+新增 usage/balance Provider Adapter
+执行回归验证
+复审并发刷新修复
+```
 
 ---
 
 ## 原生 Agent 生命周期
 
-真实 native spawn 成功后，Manager 立即记录：
+真实 native spawn 成功后，Manager 记录：
 
 ```text
 agent_team_subagent_started
@@ -168,6 +227,10 @@ agent_team_subagent_started
 agent_team_subagent_finished
 ```
 
+v0.3.2 进一步要求：**宿主返回 native Agent handle / display name 后，`agent_team_subagent_started` 应成为第一条 Runtime 动作**，之后才能等待该 Agent、继续创建下一个 Agent 或做无关工作。
+
+这不能把 MCP Runtime 变成宿主原生事件流，但可以显著缩短 Codex 右侧“子智能体数量”和 Dashboard“已记录数量”短暂不同步的窗口。
+
 例如：
 
 ```text
@@ -177,7 +240,7 @@ task: T1
 status: running → done
 ```
 
-Runtime 会自动把真实原生 Agent 启动视为 `NATIVE_SUBAGENTS` 证据，并阻止仍有活跃原生 Agent 时提前完成关联任务。v0.3.1 起，只要真实原生 Agent 已记录，本次团队运行就不能再被手动降级为保底模式。
+Runtime 会自动把真实原生 Agent 启动视为 `NATIVE_SUBAGENTS` 证据，并阻止仍有活跃原生 Agent 时提前完成关联任务。
 
 ---
 
@@ -325,18 +388,19 @@ auto-agent-team/
 # 当前版本
 
 ```text
-v0.3.1
+v0.3.2
 ```
 
-v0.3.1 在 v0.3.0 稳定线之上重点加固：
+v0.3.2 在 v0.3.1 稳定线之上重点修复：
 
 ```text
-主任务 / 动态任务写入 Runtime 数据
-→ schema v5
-→ 保底模式必须提供具体原因
-→ Dashboard 显示保底原因
-→ 真实 native Agent 一旦成功记录，NATIVE_SUBAGENTS 本次运行不可降级
-→ smoke test 覆盖这些状态真实性规则
+角色驱动 task kind 推断
+→ Tester / Reviewer 结果正确进入验证与审查面板
+→ 项目 phase 改为正式任务状态驱动
+→ sidecar Agent 不再提前推进阶段
+→ 通用 Task N 标题自动归一化
+→ spawn 成功后立即登记 native lifecycle
+→ smoke test 覆盖完整回归场景
 ```
 
 详细变更见 `CHANGELOG.md`。
