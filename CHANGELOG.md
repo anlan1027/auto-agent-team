@@ -2,6 +2,61 @@
 
 All notable project changes are summarized here.
 
+## v0.3.2 — 2026-09-01
+
+Runtime truthfulness and Dashboard classification fixes based on a complete real native-Agent-Team project run.
+
+### Fixed
+
+- Global project phase is now driven by formal Runtime task state instead of merely by the role of an active sidecar native agent.
+- Running main tasks take precedence when deriving phase, so a sidecar Tester or Researcher preparing future work cannot prematurely advance the whole project into verification or review.
+- Generic or missing task kinds are inferred from logical member roles when possible:
+  - Researcher / Explorer → `research`
+  - Architect → `architecture`
+  - Developer → `implementation`
+  - Tester / QA → `verification`
+  - Debugger → `debug`
+  - Reviewer / Security Reviewer → `review`
+- Dashboard verification/review evidence panels now use role-aware fallback classification, so legacy tasks stored as `kind: task` still appear under the correct Verification or Review panel.
+- Generic `Task 1`, `Task 2`, etc. subjects are normalized to more meaningful task titles when enough role/objective/result context exists.
+- Dynamic follow-up work is encouraged and normalized toward meaningful subjects instead of generic numbering.
+
+### Changed
+
+- `agent_team_subagent_started` is now explicitly required to be the first Runtime action after the Codex Host returns a successful native-agent handle/display name, before waiting on the agent, spawning another agent, or doing unrelated Manager work.
+- This tighter lifecycle ordering reduces the temporary synchronization window where Codex may show one more native subagent than the Runtime Dashboard has recorded.
+- Manager, Skill, and default prompt guidance now explicitly require task-semantic accuracy and formal-task-driven global phase truthfulness.
+- Plugin, Runtime, smoke test, and bilingual root/Plugin README documentation are synchronized on `0.3.2`.
+
+### Verification
+
+The bundled smoke test now covers the full regression path:
+
+```text
+schema v5 and fixed main-task classification
+role-driven task-kind inference
+generic task-title normalization
+fallback reason enforcement
+sticky native execution mode
+implementation main task running
+sidecar Tester starts without formal verification task
+phase remains running
+formal Tester task starts
+phase becomes verifying
+formal Reviewer task starts
+phase becomes reviewing
+linked-task completion gating
+generic dynamic follow-up normalization
+fixed main-task denominator
+Dashboard role fallback for Verification / Review evidence
+```
+
+Expected result:
+
+```text
+Auto Agent Team runtime smoke test passed.
+```
+
 ## v0.3.1 — 2026-08-31
 
 State-truthfulness and dashboard-stability hardening on top of the v0.3.0 stable line.
