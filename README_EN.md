@@ -6,7 +6,7 @@
 
 An automatic multi-agent engineering orchestrator for OpenAI Codex.
 
-**v0.3.1** focuses on a simple model: the user describes a project goal, the Manager analyzes requirements, builds the task graph, uses real native Codex subagents by default for suitable independent work, and keeps members, tasks, dependencies, native-agent lifecycle, verification, and review visible through the local Runtime and Dashboard.
+**v0.3.2** focuses on a simple model: the user describes a project goal, the Manager analyzes requirements, builds the task graph, uses real native Codex subagents by default for suitable independent work, and keeps members, tasks, dependencies, native-agent lifecycle, verification, and review visible through the local Runtime and Dashboard.
 
 ---
 
@@ -67,7 +67,7 @@ same-context role playing
 self-review
 ```
 
-Only when real native spawning is unavailable, disabled, unsupported, or an actual spawn attempt fails may the runtime use the internal state:
+Only when real native spawning is unavailable, disabled, unsupported, or an actual spawn attempt fails may the runtime use:
 
 ```text
 SEQUENTIAL_ROLE_FALLBACK
@@ -79,7 +79,7 @@ The Dashboard presents that state as:
 Single-Agent Backup
 ```
 
-It is not the default Agent Team mode. Entering backup mode now requires a concrete reason, and the Dashboard displays that reason explicitly.
+Entering backup requires a concrete reason, and the Dashboard displays that reason explicitly.
 
 Once at least one real native subagent has been successfully recorded for the current team run, execution mode is locked to:
 
@@ -150,7 +150,66 @@ The top-level progress remains stable, for example:
 Main tasks 8/9
 ```
 
-Dynamic tasks are displayed separately, so the main-task denominator does not keep growing. Existing schema v4 state remains compatible by deriving legacy dynamic tasks from recorded `task_added` events under the schema v5 semantics.
+Dynamic tasks are displayed separately, so the main-task denominator does not keep growing. Existing schema v4 state remains compatible by deriving legacy dynamic tasks from recorded `task_added` events under schema v5 semantics.
+
+---
+
+## v0.3.2: Task Semantics and Phase Truthfulness
+
+v0.3.2 addresses two Dashboard truthfulness issues found during a complete real project run.
+
+### 1. Role-aware task-kind inference
+
+When a task has no explicit `kind`, or is incorrectly stored as generic `task`, the Runtime can infer a better kind from the logical member role:
+
+```text
+Researcher / Explorer → research
+Architect → architecture
+Developer → implementation
+Tester / QA → verification
+Debugger → debug
+Reviewer / Security Reviewer → review
+```
+
+So even if legacy tasks were stored like:
+
+```text
+T3 · tester · kind=task
+T4 · reviewer · kind=task
+```
+
+the Dashboard's `Test / Verification` and `Review / Re-review` panels still show the real results instead of incorrectly reporting `No results`.
+
+### 2. Project phase follows formal task state
+
+Global phase is no longer inferred mainly from the role of whichever native Agent happens to be active. Running formal Runtime main tasks take precedence.
+
+```text
+T2 implementation running
++ sidecar Tester preparing verification
+→ global phase remains Execute
+
+T3 verification actually starts running
+→ global phase becomes Verify
+
+T4 review actually starts running
+→ global phase becomes Review
+```
+
+A sidecar Tester / Researcher preparing future work can no longer advance the entire project phase early.
+
+### 3. Generic task-title normalization
+
+When titles are generic `Task 1`, `Task 2`, and so on, the Runtime uses role, task kind, objective, and available result context to normalize them into more meaningful labels when possible.
+
+The Manager is still instructed to provide concrete subjects directly, especially for dynamic work, for example:
+
+```text
+Fix API-key exposure found by security review
+Add generic usage/balance Provider Adapter
+Run regression verification
+Re-review concurrency fixes
+```
 
 ---
 
@@ -168,6 +227,10 @@ When that native agent completes, fails, or is cancelled, the Manager records:
 agent_team_subagent_finished
 ```
 
+v0.3.2 further requires that **after the host returns a native Agent handle/display name, `agent_team_subagent_started` should be the first Runtime action** before waiting on that Agent, spawning another one, or doing unrelated work.
+
+This does not turn the MCP Runtime into a native host event stream, but it substantially reduces the short synchronization window where Codex's visible subagent count and the Dashboard's recorded count can temporarily differ.
+
 Example:
 
 ```text
@@ -177,7 +240,7 @@ task: T1
 status: running → done
 ```
 
-The Runtime treats real native-agent start as evidence for `NATIVE_SUBAGENTS` and prevents linked tasks from being completed while a native agent is still active. Starting with v0.3.1, once a real native agent has been recorded, the current team run cannot be manually downgraded to backup mode.
+The Runtime treats real native-agent start as evidence for `NATIVE_SUBAGENTS` and prevents linked tasks from being completed while a native agent is still active.
 
 ---
 
@@ -325,18 +388,19 @@ auto-agent-team/
 # Current Version
 
 ```text
-v0.3.1
+v0.3.2
 ```
 
-v0.3.1 hardens the v0.3.0 stable line with:
+v0.3.2 hardens the v0.3.1 stable line with:
 
 ```text
-persisted main / dynamic task classes
-→ schema v5
-→ backup mode requires a concrete reason
-→ Dashboard displays that backup reason
-→ NATIVE_SUBAGENTS becomes non-downgradable after a real native agent is recorded
-→ smoke tests cover these state-truthfulness rules
+role-aware task-kind inference
+→ Tester / Reviewer results appear in the correct evidence panels
+→ project phase follows formal task state
+→ sidecar Agents no longer advance phase early
+→ generic Task N titles are normalized
+→ native lifecycle is recorded immediately after spawn success
+→ smoke tests cover the full regression path
 ```
 
 See `CHANGELOG.md` for release notes.
