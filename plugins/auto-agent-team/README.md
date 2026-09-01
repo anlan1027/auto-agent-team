@@ -4,7 +4,7 @@
   中文 | <a href="README_EN.md">English</a>
 </p>
 
-当前稳定版本：**v0.3.1**。
+当前稳定版本：**v0.3.2**。
 
 这个目录包含 Auto Agent Team 的可选 Codex Plugin 层。
 
@@ -55,7 +55,7 @@ Dashboard 对应显示：
 
 ## Runtime 工具
 
-v0.3.1 Runtime 提供 10 个工具：
+v0.3.2 Runtime 提供 10 个工具：
 
 - `agent_team_create`
 - `agent_team_get`
@@ -83,13 +83,45 @@ Runtime 任务：  T1
 
 真实原生委派成功后，Manager 调用 `agent_team_subagent_started` 记录启动；子 Agent 完成、失败或取消后，再调用 `agent_team_subagent_finished` 记录终态。
 
+v0.3.2 进一步要求生命周期写入紧贴真实 spawn：宿主返回 native Agent handle / display name 后，`agent_team_subagent_started` 应成为第一条 Runtime 动作，再等待该 Agent、创建下一个 Agent 或继续其他工作，以缩短 Host 与 Dashboard 的短暂计数不同步窗口。
+
 普通聊天、顶层 Task、`create_thread`、`fork_thread`、`handoff_thread` 或 cross-task delegation 都不算原生子 Agent。
 
 正在运行的原生子 Agent 会参与完成门禁：只要与任务关联的原生子 Agent 仍在运行，该任务就不能被标记为完成。
 
+## 任务语义与项目阶段
+
+v0.3.2 会在 `kind` 缺失或为通用 `task` 时，根据逻辑成员角色推断更准确的任务类型：
+
+```text
+Researcher / Explorer → research
+Architect → architecture
+Developer → implementation
+Tester / QA → verification
+Debugger → debug
+Reviewer → review
+```
+
+通用的 `Task 1` / `Task 2` 标题也会在可能时被归一化为有意义的任务标题。Manager 仍应优先直接提供真实、具体的 subject，尤其是 Review 修复和动态任务。
+
+全局阶段现在由正式 Runtime 任务状态驱动，运行中的主任务优先。仅有 sidecar Tester/Researcher 在做准备工作，不会再提前把整个项目推进到“验证/审查”。例如：
+
+```text
+T2 implementation running + sidecar Tester planning
+→ 执行
+
+T3 verification running
+→ 验证
+
+T4 review running
+→ 审查
+```
+
+Dashboard 的“测试 / Verification”和“Review / Re-review”区域同时带有角色兜底分类；即使旧任务错误保存为 `kind: task`，Tester/Reviewer 的真实结果也不会再显示成“暂无结果”。
+
 ## 主任务与动态后续任务
 
-v0.3.1 使用 schema v5，把任务类别直接写入 Runtime 状态：
+schema v5 把任务类别直接写入 Runtime 状态：
 
 ```text
 taskClass: main
@@ -140,11 +172,13 @@ Smoke test 会验证：
 - 保底模式必须提供原因；
 - 原生模式成功后禁止降级；
 - 关联任务完成门禁；
-- 依赖调度；
-- 最终成员状态收敛；
-- 修复任务重新打开团队；
-- Dashboard 原生 Agent 状态；
+- 角色驱动的 task kind 推断；
+- 通用任务标题归一化；
+- sidecar Tester 不会提前推进全局阶段；
+- 正式验证任务进入 `verifying`；
+- 正式 Reviewer 任务进入 `reviewing`；
 - Dashboard 主任务 / 动态任务分离；
+- Dashboard 对验证 / Review 的角色兜底分类；
 - Dashboard 保底原因显示。
 
 期望输出：
