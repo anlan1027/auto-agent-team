@@ -219,6 +219,18 @@ agent_team_subagent_started
   taskId = mapped Runtime task when known
 ```
 
+The lifecycle write must be adjacent to the real spawn boundary:
+
+```text
+native spawn succeeds / host returns handle or display name
+↓
+FIRST Runtime action: agent_team_subagent_started
+↓
+only then wait on it, spawn another native agent, or continue unrelated Manager work
+```
+
+For multiple independent native spawns, record each successful spawn immediately as its handle/name becomes available. Do not batch-create several native agents and only backfill Runtime state later.
+
 When it returns, fails, or is cancelled:
 
 ```text
@@ -266,6 +278,47 @@ execution context
 ```
 
 Every assigned Runtime task must map to a logical member. Never create assigned tasks with zero matching logical members.
+
+Give every Runtime task a meaningful subject and the most accurate `kind` available. Do not intentionally use generic titles such as `Task 1` when the real purpose is known.
+
+Preferred role-to-kind mapping:
+
+```text
+Researcher / Explorer → research
+Architect → architecture
+Developer → implementation
+Tester / QA → verification
+Debugger → debug
+Reviewer / Security Reviewer → review
+```
+
+For dynamically discovered work, use specific subjects such as:
+
+```text
+Fix API-key exposure found by security review
+Add generic usage/balance Provider Adapter
+Run regression verification
+Re-review concurrency fixes
+```
+
+Use `agent_team_add_task` for remediation, regression, re-review, and other follow-up work. Runtime may normalize missing semantics as a safety net, but the Manager should provide the real task meaning whenever known.
+
+### Global phase truthfulness
+
+The global project phase must be driven by formal Runtime task state, with running main tasks taking precedence over sidecar agent roles.
+
+```text
+implementation main task running + sidecar Tester planning
+→ phase remains running / 执行
+
+formal verification task running
+→ phase = verifying / 验证
+
+formal review task running
+→ phase = reviewing / 审查
+```
+
+A sidecar Researcher/Tester/Reviewer without a running formal task must not prematurely advance the whole project phase.
 
 Use the smallest effective team that preserves useful independence. Independent work may run in parallel; dependent work remains ordered. Prefer non-overlapping file ownership for concurrent writers.
 
