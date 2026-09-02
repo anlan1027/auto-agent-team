@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    name: Runtime validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check MCP runtime syntax
+        run: node --check plugins/auto-agent-team/mcp/server.mjs
+
+      - name: Run runtime smoke test
+        run: node plugins/auto-agent-team/scripts/smoke-test.mjs
