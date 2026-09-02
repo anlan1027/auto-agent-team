@@ -181,6 +181,7 @@ try {
   const resource = await request("resources/read", { uri: "ui://auto-agent-team/team-dashboard.html" });
   const html = resource?.contents?.[0]?.text || "";
   assert(html.includes("原生子智能体") && html.includes("仍有 ${activeNative.length} 个原生子智能体运行中"), "dashboard should expose native subagent state");
+  assert(html.includes("当前原生 Agent") && html.includes("累计原生 Agent"), "dashboard should distinguish current and cumulative native agent counts");
   assert(html.includes("主任务完成") && html.includes("动态子任务"), "dashboard should separate main and dynamic tasks");
   assert(html.includes('t.taskClass==="dynamic"'), "dashboard should prefer persisted runtime taskClass");
   assert(html.includes("保底原因"), "dashboard should display fallback reason when fallback is active");
