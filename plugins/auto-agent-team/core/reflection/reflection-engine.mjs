@@ -1,4 +1,4 @@
-import { evaluateResult } from './evaluators.mjs';
+import { evaluateResult } from './evaluator.mjs';
 
 export function reflectExecution(context = {}) {
   const evaluation = evaluateResult(context.result || {});
