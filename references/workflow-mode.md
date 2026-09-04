@@ -2,79 +2,127 @@
 
 ## Purpose
 
-Auto Agent Team should select the smallest effective workflow for the user's goal.
+Auto Agent Team v0.3.3 introduces workflow selection as an orchestration layer.
 
-Workflow decides which roles are required. It does not replace native Agent Team execution.
+Workflow Mode decides the required process depth. It does **not** replace Native Agent Team execution, native lifecycle tracking, or Runtime truth.
 
-## Modes
+Supported modes:
 
-### QUICK (default)
+```text
+QUICK
+STANDARD
+RELEASE
+```
 
-For:
+Default:
 
-- homework
+```text
+STANDARD
+```
+
+---
+
+## QUICK
+
+Use for small scoped work.
+
+Examples:
+
+- small bug fixes
+- configuration changes
+- single module edits
 - small experiments
-- small code changes
-- temporary documents
 
 Flow:
 
 ```text
 Manager
   ↓
-Execution Agent(s)
+Developer / Execution Agent
   ↓
-Basic verification
+Basic Verification
   ↓
 Complete
 ```
 
-Do not start audit or release roles unless requested.
+Avoid unnecessary research, architecture review, or release checks.
 
-### STANDARD
+---
 
-For:
+## STANDARD
 
+Default engineering workflow.
+
+Use for:
+
+- normal feature development
+- multi-file changes
 - course projects
-- reports
-- formal PPT
-- multi-file engineering tasks
+- formal deliverables
 
 Flow:
 
 ```text
-Round 1: Production
-  Builder / Writer / Tester
-
-Round 2: Audit
-  Source Auditor
-  Evidence Reviewer
+Manager
+ ↓
+Researcher
+ ↓
+Architect
+ ↓
+Developer
+ ↓
+Tester
+ ↓
+Independent Reviewer
+ ↓
+Delivery
 ```
 
-### RELEASE
+This preserves v0.3.2 Native Agent Team behavior.
 
-For:
+---
 
-- GitHub projects
+## RELEASE
+
+Use for public delivery or version release.
+
+Examples:
+
+- GitHub releases
 - open source delivery
-- version releases
+- production packaging
+- security-sensitive changes
 
 Flow:
 
 ```text
-Production
-  ↓
-Audit
-  ↓
-Release
+Manager
+ ↓
+Architect
+ ↓
+Developer
+ ↓
+Tester
+ ↓
+Debugger
+ ↓
+Security Review
+ ↓
+Release Review
+ ↓
+Release Preparation
 ```
 
-## Selection hints
+---
 
-Use QUICK when the user only wants an answer or artifact.
+## Compatibility Rules
 
-Use STANDARD when correctness, evidence, or formal delivery matters.
+Workflow Mode must never:
 
-Use RELEASE only when versioning, packaging, or public delivery is explicitly involved.
+- fake native agents
+- replace executionMode
+- bypass Runtime lifecycle events
+- mark unverified work as complete
+- convert ordinary tasks into releases automatically
 
-Never create GitHub releases by default for normal tasks.
+Native Agent Team remains the execution foundation.
