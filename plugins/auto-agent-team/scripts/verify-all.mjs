@@ -10,10 +10,6 @@ const checks = [
     script: 'adaptive-core-smoke-test.mjs',
   },
   {
-    name: 'Adaptive MCP',
-    script: 'adaptive-mcp-smoke-test.mjs',
-  },
-  {
     name: 'Existing Runtime',
     script: 'smoke-test.mjs',
   },
@@ -43,4 +39,4 @@ for (const check of checks) {
 }
 
 console.log('\nAll Auto Agent Team verification checks passed.');
-console.log('Next validation step: load the plugin in Codex and confirm both MCP servers start and adaptive tools are visible.');
+console.log('Next validation step: load Auto Agent Team in Codex and invoke the plugin normally.');
