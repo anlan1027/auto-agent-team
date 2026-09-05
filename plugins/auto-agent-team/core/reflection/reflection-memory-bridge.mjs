@@ -4,16 +4,27 @@ import { saveFailure } from '../memory/failure-memory.mjs';
 
 export function processReflection(context = {}) {
   const reflection = reflectExecution(context);
+  const baseRecord = {
+    task: context.task,
+    executionMode: context.plan?.executionMode,
+    agents: context.plan?.agents,
+    workflow: context.plan?.workflow?.workflow,
+    verificationLevel: context.plan?.verificationLevel,
+    evaluation: reflection.evaluation,
+  };
 
   if (reflection.evaluation.success) {
     saveTask({
-      task: context.task,
-      result: reflection,
+      ...baseRecord,
+      result: context.result,
+      lessons: reflection.lessons,
     });
   } else {
     saveFailure({
-      task: context.task,
+      ...baseRecord,
       reason: reflection.lessons.join(', '),
+      errors: reflection.evaluation.errors,
+      output: reflection.evaluation.output,
     });
   }
 
