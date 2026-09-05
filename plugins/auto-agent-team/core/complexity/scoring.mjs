@@ -4,7 +4,10 @@
  */
 
 const RULES = [
-  { name: 'architecture', pattern: /架构|系统设计|设计方案|重构|architecture|design/i, value: 20 },
+  // Keep this aligned with analyzer.mjs buildReason(): ordinary task wording
+  // such as "设计并实现" is still architectural intent and must contribute
+  // the same architecture signal used by the explanation layer.
+  { name: 'architecture', pattern: /架构|设计|重构|architecture|design/i, value: 20 },
   { name: 'implementation', pattern: /代码|开发|实现|编写|功能|code|implement|feature/i, value: 15 },
   { name: 'debugging', pattern: /bug|调试|错误|修复|debug|fix/i, value: 15 },
   { name: 'verification', pattern: /测试|验证|review|检查|test|verify/i, value: 10 },
