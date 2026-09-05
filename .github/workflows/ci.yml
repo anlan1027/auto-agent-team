@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   runtime:
-    name: Runtime validation
+    name: Full validation
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -27,5 +27,5 @@ jobs:
       - name: Check MCP runtime syntax
         run: node --check plugins/auto-agent-team/mcp/server.mjs
 
-      - name: Run runtime smoke test
-        run: node plugins/auto-agent-team/scripts/smoke-test.mjs
+      - name: Run full verification suite
+        run: node plugins/auto-agent-team/scripts/verify-all.mjs

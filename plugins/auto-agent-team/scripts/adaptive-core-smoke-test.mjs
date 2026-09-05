@@ -29,6 +29,7 @@ assert(simple.workflow.workflow === 'fast-path', 'simple task should use fast-pa
 const enterprise = prepareExecutionPlan(
   '设计并实现一个 full stack web 系统，包含前端、后端、数据库、测试和 review，需要多个模块协作'
 );
+assert(enterprise.complexity.score >= 80, 'large cross-module task should score at least 80');
 assert(enterprise.complexity.level === 4, 'large cross-module task should be level 4');
 assert(enterprise.executionMode === 'full-agent-team', 'enterprise task should use full-agent-team');
 assert(enterprise.workflow.workflow === 'full-lifecycle', 'enterprise task should use full lifecycle');
@@ -80,6 +81,7 @@ console.log(JSON.stringify({
     agents: simple.agents,
   },
   enterprise: {
+    score: enterprise.complexity.score,
     level: enterprise.complexity.level,
     mode: enterprise.executionMode,
     agents: enterprise.agents,
