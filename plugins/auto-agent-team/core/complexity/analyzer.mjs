@@ -1,29 +1,35 @@
 import { calculateComplexityScore, classifyComplexity } from './scoring.mjs';
 
+const LEVEL_BY_COMPLEXITY = {
+  simple: 1,
+  medium: 2,
+  complex: 3,
+  enterprise: 4,
+};
+
 /**
- * Analyze task complexity and select execution strategy.
+ * Analyze task complexity.
  *
- * simple      -> single agent
- * medium      -> small team
- * complex     -> engineering team
- * enterprise  -> full agent organization
+ * The analyzer owns classification; the router owns the final execution
+ * strategy. mode/agents are retained here for backward compatibility.
  */
 export function analyzeTaskComplexity(task = '') {
   const score = calculateComplexityScore(task);
   const complexity = classifyComplexity(score);
+  const level = LEVEL_BY_COMPLEXITY[complexity];
 
-  const strategies = {
+  const compatibilityStrategies = {
     simple: {
       mode: 'single-agent',
-      agents: ['developer']
+      agents: ['developer'],
     },
     medium: {
       mode: 'small-team',
-      agents: ['developer', 'tester']
+      agents: ['developer', 'tester'],
     },
     complex: {
       mode: 'engineering-team',
-      agents: ['architect', 'developer', 'tester', 'reviewer']
+      agents: ['architect', 'developer', 'tester', 'reviewer'],
     },
     enterprise: {
       mode: 'full-agent-team',
@@ -34,16 +40,17 @@ export function analyzeTaskComplexity(task = '') {
         'developer',
         'tester',
         'debugger',
-        'reviewer'
-      ]
-    }
+        'reviewer',
+      ],
+    },
   };
 
   return {
     score,
+    level,
     complexity,
-    ...strategies[complexity],
-    reason: buildReason(task)
+    ...compatibilityStrategies[complexity],
+    reason: buildReason(task),
   };
 }
 
@@ -58,8 +65,12 @@ function buildReason(task) {
     reasons.push('engineering work required');
   }
 
-  if (/测试|验证|review|检查/i.test(task)) {
+  if (/测试|验证|review|检查|test|verify/i.test(task)) {
     reasons.push('verification required');
+  }
+
+  if (/多个文件|多个模块|前端.*后端|数据库|full stack|multi-agent/i.test(task)) {
+    reasons.push('cross-module coordination required');
   }
 
   return reasons.length ? reasons : ['general task'];
