@@ -27,8 +27,5 @@ jobs:
       - name: Check MCP runtime syntax
         run: node --check plugins/auto-agent-team/mcp/server.mjs
 
-      - name: Check adaptive MCP syntax
-        run: node --check plugins/auto-agent-team/mcp/adaptive-server.mjs
-
       - name: Run full verification suite
         run: node plugins/auto-agent-team/scripts/verify-all.mjs
