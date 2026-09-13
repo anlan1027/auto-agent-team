@@ -57,3 +57,13 @@
 - No known blockers remain within this implementation scope. The intent classifier remains heuristic; retain new ambiguous expressions as future regression cases.
 - Codex plugin reinstall/reload and browser Dashboard verification are outside this source-change phase and have not been performed.
 - Future optional work remains memory persistence/project isolation and safer installation/state persistence; no decisions or implementation were made for these items.
+
+## GitHub Synchronization — 2026-09-13
+- Problem: user commit 4e9544b could not push because origin/feature/adaptive-runtime-integration contained six additional commits.
+- Root Cause: local and remote branch histories diverged. This was not an authentication failure or a test failure.
+- Failed Attempts: the user's initial normal push was rejected with fetch-first; no force push was attempted.
+- Solution: fetched origin and rebased the unpublished local fix onto e4ff6a8 without conflicts, preserving remote single-MCP configuration and Dashboard improvements. The rebased fix is 7261fe8.
+- Verification: the integrated verify-all suite now contains three checks (Adaptive Core, Existing Runtime, Runtime State Constraints); all passed. The removed standalone Adaptive MCP test follows the remote consolidation, not a skipped failing test.
+- Lesson: fetch and inspect divergence before integrating; preserve remote work and use normal push after verification.
+- User terminal output confirms plugin installation succeeded before this integration. The installed copy must be refreshed again to include the newly fetched changes; Codex reload remains unverified.
+- A subsequent push was rejected by GH007 because the local commits used a private email. Existing remote commits identify the repository owner's GitHub noreply address; use that address in repository-local Git configuration and rewrite only unpublished commits. Keep GitHub email protection enabled. This metadata rewrite changes commit IDs without changing tested source content.
