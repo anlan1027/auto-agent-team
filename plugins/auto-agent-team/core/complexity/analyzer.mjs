@@ -1,4 +1,5 @@
 import { calculateComplexityScore, classifyComplexity } from './scoring.mjs';
+import { classifyTaskIntent } from './intent.mjs';
 
 const LEVEL_BY_COMPLEXITY = {
   simple: 1,
@@ -14,6 +15,7 @@ const LEVEL_BY_COMPLEXITY = {
  * strategy. mode/agents are retained here for backward compatibility.
  */
 export function analyzeTaskComplexity(task = '') {
+  const intent = classifyTaskIntent(task);
   const score = calculateComplexityScore(task);
   const complexity = classifyComplexity(score);
   const level = LEVEL_BY_COMPLEXITY[complexity];
@@ -49,8 +51,9 @@ export function analyzeTaskComplexity(task = '') {
     score,
     level,
     complexity,
+    intent: intent.kind,
     ...compatibilityStrategies[complexity],
-    reason: buildReason(task),
+    reason: [intent.reason, ...(intent.kind === 'explanation' ? [] : buildReason(intent.executionText))],
   };
 }
 

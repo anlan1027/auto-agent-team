@@ -1,3 +1,5 @@
+import { classifyTaskIntent } from './intent.mjs';
+
 /**
  * Adaptive task complexity scoring engine.
  * Runs before agent selection to decide execution strategy.
@@ -16,20 +18,22 @@ const RULES = [
 ];
 
 export function calculateComplexityScore(task = '') {
+  const intent = classifyTaskIntent(task);
+  if (intent.kind === 'explanation') return 0;
+  // Negated work and explanatory context must not inflate executable scope.
+  task = intent.executionText;
   let score = 0;
-  const matched = [];
 
   for (const rule of RULES) {
     if (rule.pattern.test(task)) {
       score += rule.value;
-      matched.push(rule.name);
     }
   }
 
   if (task.length > 200) score += 5;
   if (task.length > 500) score += 10;
 
-  return Math.min(score, 100);
+  return Math.min(Math.max(score, intent.kind === 'project' ? 60 : 0), 100);
 }
 
 export function classifyComplexity(score) {

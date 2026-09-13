@@ -13,6 +13,10 @@ const checks = [
     name: 'Existing Runtime',
     script: 'smoke-test.mjs',
   },
+  {
+    name: 'Runtime State Constraints',
+    script: 'state-constraints-test.mjs',
+  },
 ];
 
 for (const check of checks) {

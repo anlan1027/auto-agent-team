@@ -29,7 +29,7 @@ function workspaceRoot(value) { return path.resolve(requireString(value, "worksp
 function confined(root, ...parts) { const target = path.resolve(root, ...parts); const rel = path.relative(root, target); if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) throw new Error("Path escapes workspace."); return target; }
 function statePath(root) { return confined(root, ".agent-team", "team.json"); }
 function readState(root) { const file = statePath(root); return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null; }
-function writeState(root, state) { const file = statePath(root); fs.mkdirSync(path.dirname(file), { recursive: true }); state.updatedAt = now(); fs.writeFileSync(file, `${JSON.stringify(state, null, 2)}\n`, "utf8"); return state; }
+function writeState(root, state) { validateExecutionState(state); const file = statePath(root); fs.mkdirSync(path.dirname(file), { recursive: true }); state.updatedAt = now(); fs.writeFileSync(file, `${JSON.stringify(state, null, 2)}\n`, "utf8"); return state; }
 function slug(value) { return String(value ?? "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "agent"; }
 function isGenericTaskText(value) { const text = String(value ?? "").trim(); return !text || /^(?:task|任务)(?:[\s#:_-]*\d+)?$/i.test(text); }
 
@@ -80,6 +80,59 @@ function validateTaskGraph(state) {
   function visit(id, stack = []) { if (visited.has(id)) return; if (visiting.has(id)) throw new Error(`Task dependency cycle detected: ${[...stack, id].join(" -> ")}`); visiting.add(id); for (const dep of byId.get(id).dependencies) visit(dep, [...stack, id]); visiting.delete(id); visited.add(id); }
   for (const task of state.tasks) visit(task.id);
 }
+// Validate before reconciliation can normalize an invalid requested transition.
+// The persistence boundary also checks this invariant for every write path.
+function validateExecutionState(state) {
+  validateTaskGraph(state);
+  const byId = new Map(state.tasks.map(task => [task.id, task]));
+  for (const task of state.tasks) {
+    if (!["running", "done"].includes(task.status)) continue;
+    const unfinished = task.dependencies.filter(id => byId.get(id)?.status !== "done");
+    if (unfinished.length) throw new Error(`Task ${task.id} cannot be ${task.status}; unfinished dependencies: ${unfinished.join(", ")}.`);
+    if (task.status === "done" && activeNativeAgents(state).some(agent => agent.taskId === task.id)) {
+      throw new Error(`Task ${task.id} cannot be marked done while a linked native subagent is still running.`);
+    }
+  }
+}
+
+function setTaskStatus(state, task, status) {
+  if (!TASK_STATUSES.has(status)) throw new Error(`Invalid task status: ${status}`);
+  if (["done", "failed"].includes(task.status) && !["done", "failed"].includes(status) &&
+      activeNativeAgents(state).some(agent => agent.taskId === task.id)) {
+    throw new Error(`Cannot reopen task ${task.id} while a linked native subagent is still running.`);
+  }
+  if (task.status === "done" && status !== "done") {
+    const descendants = new Set([task.id]);
+    let expanded = true;
+    while (expanded) {
+      expanded = false;
+      for (const other of state.tasks) {
+        if (!descendants.has(other.id) && other.dependencies.some(id => descendants.has(id))) {
+          descendants.add(other.id);
+          expanded = true;
+        }
+      }
+    }
+    const protectedTasks = state.tasks.filter(other => other.id !== task.id && descendants.has(other.id) &&
+      (["running", "done"].includes(other.status) || activeNativeAgents(state).some(agent => agent.taskId === other.id)));
+    if (protectedTasks.length) throw new Error(`Cannot reopen task ${task.id}; reset downstream tasks first: ${protectedTasks.map(other => other.id).join(", ")}.`);
+  }
+  const previous = task.status;
+  task.status = status;
+  validateExecutionState(state);
+  if (previous === status) return;
+  task.statusChangedAt = now();
+  task.blockedReason = status === "blocked" ? "manual" : null;
+  task.blockedBy = [];
+  if (["done", "failed"].includes(previous)) {
+    task.startedAt = null;
+    task.result = "";
+    task.evidence = [];
+  }
+  task.completedAt = status === "done" ? task.statusChangedAt : null;
+  if (status === "running") task.startedAt ||= task.statusChangedAt;
+}
+
 function reconcileDependencies(state) {
   const byId = new Map(state.tasks.map(t => [t.id, t])); let changed = false;
   for (const task of state.tasks) {
@@ -106,7 +159,7 @@ function reconcileMembers(state) {
 }
 function phaseFromRunningTasks(tasks) { const kinds = new Set(tasks.map(t => String(t.kind || "task").toLowerCase())); if ([...kinds].some(k => ["requirements", "research", "architecture", "implementation", "debug", "task"].includes(k))) return "running"; if (kinds.has("integration")) return "integrating"; if ([...kinds].some(k => ["verification", "test", "testing", "regression"].includes(k))) return "verifying"; if ([...kinds].some(k => ["review", "code_review", "re_review"].includes(k))) return "reviewing"; return "running"; }
 function derivePhase(state) { const active = activeNativeAgents(state); if (!state.tasks.length) return "planning"; if (state.tasks.every(t => t.status === "done") && active.length === 0) return "completed"; const mainRunning = state.tasks.filter(t => t.taskClass === "main" && t.status === "running"); const running = mainRunning.length ? mainRunning : state.tasks.filter(t => t.status === "running"); if (running.length) return phaseFromRunningTasks(running); if (active.length) return "running"; const blocked = state.tasks.some(t => ["failed", "blocked"].includes(t.status)); if (blocked && !state.tasks.some(t => t.status === "ready")) return "blocked"; return state.tasks.some(t => ["done", "ready"].includes(t.status)) ? "running" : "planning"; }
-function reconcileState(state) { enrichTaskSemantics(state); validateTaskGraph(state); let changed = reconcileDependencies(state); changed = reconcileMembers(state) || changed; const phase = derivePhase(state); if (state.phase !== phase) { appendEvent(state, "phase_changed", `Phase ${state.phase || "unknown"} → ${phase}.`); state.phase = phase; changed = true; } return changed; }
+function reconcileState(state) { enrichTaskSemantics(state); validateExecutionState(state); let changed = reconcileDependencies(state); changed = reconcileMembers(state) || changed; const phase = derivePhase(state); if (state.phase !== phase) { appendEvent(state, "phase_changed", `Phase ${state.phase || "unknown"} → ${phase}.`); state.phase = phase; changed = true; } return changed; }
 function reconcileAndPersist(root, state) { if (reconcileState(state)) writeState(root, state); }
 function findNativeAgent(state, args) { const id = args.nativeAgentId ? String(args.nativeAgentId) : null; const name = args.name ? String(args.name) : null; if (!id && !name) throw new Error("nativeAgentId or name is required."); return state.nativeAgents.find(a => (id && a.id === id) || (name && a.name === name)); }
 
@@ -135,12 +188,57 @@ function callTool(name, args = {}) {
   if (name === "agent_team_subagent_started") {
     const { root, state } = requiredWorkspaceState(args); const displayName = requireString(args.name, "name"); const role = requireString(args.role, "role"); if (args.memberId != null && !state.members.some(m => m.id === args.memberId || m.name === args.memberId)) throw new Error(`Unknown member: ${args.memberId}`); if (args.taskId != null && !state.tasks.some(t => t.id === args.taskId)) throw new Error(`Unknown task: ${args.taskId}`);
     const requestedId = args.nativeAgentId ? String(args.nativeAgentId) : null; let agent = state.nativeAgents.find(a => (requestedId && a.id === requestedId) || (!requestedId && a.name === displayName && a.status === "running")); if (!agent) { let id = requestedId || `native-${slug(displayName)}`; if (state.nativeAgents.some(a => a.id === id)) id = `${id}-${Date.now()}`; agent = { id, name: displayName, role, memberId: args.memberId ?? null, taskId: args.taskId ?? null, status: "running", summary: args.summary ? String(args.summary) : "", result: "", evidence: [], startedAt: now(), finishedAt: null }; state.nativeAgents.push(agent); } else Object.assign(agent, { name: displayName, role, memberId: args.memberId ?? agent.memberId, taskId: args.taskId ?? agent.taskId, status: "running", summary: args.summary ? String(args.summary) : agent.summary, finishedAt: null });
-    if (agent.taskId) { reconcileDependencies(state); const task = state.tasks.find(t => t.id === agent.taskId); if (["ready", "running"].includes(task.status)) { task.status = "running"; task.statusChangedAt = now(); task.startedAt ||= task.statusChangedAt; } else throw new Error(`Cannot start native subagent for task ${task.id} while task status is ${task.status}.`); }
+    if (agent.taskId) { reconcileDependencies(state); const task = state.tasks.find(t => t.id === agent.taskId); if (["ready", "running"].includes(task.status)) { setTaskStatus(state, task, "running"); } else throw new Error(`Cannot start native subagent for task ${task.id} while task status is ${task.status}.`); }
     if (state.executionMode !== "NATIVE_SUBAGENTS") { const previous = state.executionMode; state.executionMode = "NATIVE_SUBAGENTS"; appendEvent(state, "execution_mode_changed", `Execution mode ${previous} → NATIVE_SUBAGENTS because native subagent ${agent.name} started.`); } state.fallbackReason = null; appendEvent(state, "subagent_started", `${agent.name} started as ${agent.role}${agent.taskId ? ` on ${agent.taskId}` : ""}.`, agent.memberId, agent.taskId); reconcileState(state); writeState(root, state); return textAndStructured(`Recorded native subagent ${agent.name} as running.`, { workspacePath: root, statePath: statePath(root), initialized: true, nativeAgent: agent, team: state });
   }
-  if (name === "agent_team_subagent_finished") { const { root, state } = requiredWorkspaceState(args); const agent = findNativeAgent(state, args); if (!agent) throw new Error("Tracked native subagent not found."); if (!NATIVE_AGENT_STATUSES.has(args.status) || args.status === "running") throw new Error(`Invalid terminal subagent status: ${args.status}`); agent.status = args.status; agent.finishedAt = now(); if (typeof args.result === "string") agent.result = args.result; if (Array.isArray(args.evidence)) agent.evidence = args.evidence.map(String); if (agent.taskId) { const task = state.tasks.find(t => t.id === agent.taskId); if (task) { task.status = args.status === "done" ? "done" : "failed"; task.statusChangedAt = now(); if (task.status === "done") task.completedAt = task.statusChangedAt; if (agent.result) task.result = agent.result; if (agent.evidence.length) task.evidence = [...agent.evidence]; } } appendEvent(state, "subagent_finished", `${agent.name} ${agent.status}${agent.taskId ? ` on ${agent.taskId}` : ""}.`, agent.memberId, agent.taskId); reconcileState(state); writeState(root, state); return textAndStructured(`Recorded native subagent ${agent.name} as ${agent.status}.`, { workspacePath: root, statePath: statePath(root), initialized: true, nativeAgent: agent, team: state }); }
+  if (name === "agent_team_subagent_finished") {
+    const { root, state } = requiredWorkspaceState(args);
+    const agent = findNativeAgent(state, args);
+    if (!agent) throw new Error("Tracked native subagent not found.");
+    if (!NATIVE_AGENT_STATUSES.has(args.status) || args.status === "running") throw new Error(`Invalid terminal subagent status: ${args.status}`);
+    if (agent.status !== "running") {
+      if (agent.status !== args.status) throw new Error(`Native subagent ${agent.id} already finished as ${agent.status}; cannot change its terminal status.`);
+      // A transport retry must not complete a task that has since been reopened.
+      return textAndStructured(`Native subagent ${agent.name} was already recorded as ${agent.status}.`, { workspacePath: root, statePath: statePath(root), initialized: true, nativeAgent: agent, team: state });
+    }
+    agent.status = args.status;
+    agent.finishedAt = now();
+    if (typeof args.result === "string") agent.result = args.result;
+    if (Array.isArray(args.evidence)) agent.evidence = args.evidence.map(String);
+    if (agent.taskId) {
+      const task = state.tasks.find(t => t.id === agent.taskId);
+      if (task) {
+        // Record each real finish, but wait for all agents sharing the task.
+        const linked = state.nativeAgents.filter(item => item.taskId === task.id);
+        const stillRunning = linked.some(item => item.status === "running");
+        if (args.status !== "done") {
+          setTaskStatus(state, task, "failed");
+          if (agent.result) task.result = agent.result;
+          if (agent.evidence.length) task.evidence = [...agent.evidence];
+        } else if (!stillRunning && task.status !== "failed") {
+          setTaskStatus(state, task, "done");
+          if (agent.result) task.result = agent.result;
+          if (agent.evidence.length) task.evidence = [...agent.evidence];
+        }
+      }
+    }
+    appendEvent(state, "subagent_finished", `${agent.name} ${agent.status}${agent.taskId ? ` on ${agent.taskId}` : ""}.`, agent.memberId, agent.taskId);
+    reconcileState(state);
+    writeState(root, state);
+    return textAndStructured(`Recorded native subagent ${agent.name} as ${agent.status}.`, { workspacePath: root, statePath: statePath(root), initialized: true, nativeAgent: agent, team: state });
+  }
   if (name === "agent_team_update_member") { const { root, state } = requiredWorkspaceState(args); const member = state.members.find(m => m.id === args.memberId || m.name === args.memberId); if (!member) throw new Error(`Unknown member: ${args.memberId}`); if (args.status !== undefined) { if (!MEMBER_STATUSES.has(args.status)) throw new Error(`Invalid member status: ${args.status}`); member.status = args.status; member.statusSource = "manual"; } if (Object.hasOwn(args, "currentTask")) { if (args.currentTask !== null && !state.tasks.some(t => t.id === args.currentTask)) throw new Error(`Unknown currentTask: ${args.currentTask}`); member.currentTask = args.currentTask; } if (typeof args.summary === "string") member.summary = args.summary; appendEvent(state, "member_update", `${member.name} → ${member.status}.`, member.id, member.currentTask); reconcileState(state); writeState(root, state); return textAndStructured(`Updated member ${member.name}.`, { workspacePath: root, statePath: statePath(root), initialized: true, team: state }); }
-  if (name === "agent_team_update_task") { const { root, state } = requiredWorkspaceState(args); const task = state.tasks.find(t => t.id === args.taskId); if (!task) throw new Error(`Unknown task: ${args.taskId}`); if (args.status === "done" && activeNativeAgents(state).some(a => a.taskId === task.id)) throw new Error(`Task ${task.id} cannot be marked done while a linked native subagent is still running.`); if (args.status !== undefined) { if (!TASK_STATUSES.has(args.status)) throw new Error(`Invalid task status: ${args.status}`); task.status = args.status; task.statusChangedAt = now(); task.blockedReason = args.status === "blocked" ? "manual" : null; task.blockedBy = []; if (args.status === "running") task.startedAt ||= task.statusChangedAt; if (args.status === "done") task.completedAt = task.statusChangedAt; } if (typeof args.result === "string") task.result = args.result; if (Array.isArray(args.evidence)) task.evidence = args.evidence.map(String); enrichTaskSemantics(state); reconcileState(state); writeState(root, state); return textAndStructured(`Updated task ${task.id}.`, { workspacePath: root, statePath: statePath(root), initialized: true, team: state }); }
+  if (name === "agent_team_update_task") {
+    const { root, state } = requiredWorkspaceState(args);
+    const task = state.tasks.find(t => t.id === args.taskId);
+    if (!task) throw new Error(`Unknown task: ${args.taskId}`);
+    if (args.status !== undefined) setTaskStatus(state, task, args.status);
+    if (typeof args.result === "string") task.result = args.result;
+    if (Array.isArray(args.evidence)) task.evidence = args.evidence.map(String);
+    reconcileState(state);
+    writeState(root, state);
+    return textAndStructured(`Updated task ${task.id}.`, { workspacePath: root, statePath: statePath(root), initialized: true, team: state });
+  }
   if (name === "agent_team_append_event") { const { root, state } = requiredWorkspaceState(args); appendEvent(state, requireString(args.kind, "kind"), requireString(args.message, "message"), args.memberId ?? null, args.taskId ?? null); writeState(root, state); return textAndStructured("Recorded Agent Team event.", { workspacePath: root, statePath: statePath(root), initialized: true, team: state }); }
   if (name === "agent_team_render_dashboard") { const { root, state } = optionalWorkspaceState(args); const dashboardState = state || uninitializedDashboardState(root); if (state) reconcileAndPersist(root, dashboardState); return textAndStructured(state ? `Showing Agent Team dashboard for "${dashboardState.name}".` : "Showing an uninitialized Agent Team dashboard.", { workspacePath: root, statePath: statePath(root), initialized: Boolean(state), team: dashboardState }, { ui: { resourceUri: TEMPLATE_URI }, "openai/outputTemplate": TEMPLATE_URI }); }
   throw new Error(`Unknown tool: ${name}`);
