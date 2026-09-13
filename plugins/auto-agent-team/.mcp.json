@@ -6,13 +6,6 @@
       "args": [
         "./mcp/server.mjs"
       ]
-    },
-    "auto-agent-team-adaptive": {
-      "cwd": ".",
-      "command": "node",
-      "args": [
-        "./mcp/adaptive-server.mjs"
-      ]
     }
   }
 }

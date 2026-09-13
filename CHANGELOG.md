@@ -2,6 +2,15 @@
 
 All notable project changes are summarized here.
 
+## Unreleased
+
+- Route task intent before keyword complexity: project requests receive an engineering planning floor, while explanations remain lightweight, including after historical failures.
+- Enforce unfinished-dependency rejection for running/completed tasks across Runtime creation, task insertion, updates, and native lifecycle writes. Rejected writes leave persisted state unchanged.
+- Require explicit downstream reset before reopening a completed prerequisite with running/completed dependents.
+- Prevent one native agent from completing a task while another linked agent is still active; preserve peer failures until an explicit retry.
+- Make repeated native terminal notifications idempotent, reject conflicting terminal outcomes, and prevent retries while a linked peer is still running.
+- Add bilingual intent regression cases and MCP state-constraint regression checks to the full verification suite.
+
 ## v0.3.2 — 2026-09-01
 
 Runtime truthfulness and Dashboard classification fixes based on a complete real native-Agent-Team project run.

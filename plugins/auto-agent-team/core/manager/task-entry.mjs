@@ -16,6 +16,14 @@ export function prepareExecutionPlan(task = '') {
     task: normalizedTask,
     verificationLevel: routing.verificationLevel,
   });
+  // Failed explanations remain a one-agent conversation. History is retained
+  // for context but does not turn an explanation into an engineering workflow.
+  if (routing.complexity.intent === 'explanation') {
+    adaptation.requireTester = false;
+    adaptation.requireReviewer = false;
+    adaptation.verificationLevel = routing.verificationLevel;
+    adaptation.adjustments = ['keep explanation on the lightweight path'];
+  }
 
   const team = buildAdaptiveTeam({
     task: normalizedTask,
